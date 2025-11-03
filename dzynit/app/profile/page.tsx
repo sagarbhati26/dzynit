@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import DraftCard from "../../components/DraftCard";
+import DraftCard from "@/components/DraftCard";
 
 // Mock data for user profile
 const user = {
-  name: "sagar bhati",
-  username: "sagarbhati",
+  name: "Sagar Bhati",
+  username: "Sagarbhati",
   bio: "Digital designer and t-shirt enthusiast. Creating unique apparel designs since 2020.",
-  joinDate: "March 2023",
+  joinDate: "September 2025",
   avatar: "/avatar-placeholder.png" // This would be replaced with an actual avatar image
 };
 
@@ -69,11 +69,7 @@ export default function ProfilePage() {
             <div className="text-3xl font-bold">{drafts.length + publishedDesigns.length}</div>
           </div>
           <div className="card-glass rounded-xl p-5 soft-shadow">
-            <div className="text-sm text-muted mb-1">Total Sales(only for self view)</div>
-            <div className="text-3xl font-bold">{publishedDesigns.reduce((sum, design) => sum + design.sales, 0)}</div>
-          </div>
-          <div className="card-glass rounded-xl p-5 soft-shadow">
-            <div className="text-sm text-muted mb-1">followers*public</div>
+            <div className="text-sm text-muted mb-1">Total Sales</div>
             <div className="text-3xl font-bold">{publishedDesigns.reduce((sum, design) => sum + design.sales, 0)}</div>
           </div>
           <div className="card-glass rounded-xl p-5 soft-shadow">

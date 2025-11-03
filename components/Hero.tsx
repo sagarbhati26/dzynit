@@ -4,8 +4,8 @@ export default function Hero() {
   return (
     <section className="grid md:grid-cols-2 gap-12 items-center py-24 relative">
       {/* Background decorative elements */}
-      <div className="absolute -z-10 top-0 right-0 w-1/3 h-1/3 bg-gradient-to-bl from-primary/10 to-accent/5 rounded-full blur-3xl"></div>
-      <div className="absolute -z-10 bottom-0 left-0 w-1/4 h-1/4 bg-gradient-to-tr from-secondary/10 to-primary/5 rounded-full blur-3xl"></div>
+      <div className="absolute -z-10 top-0 right-0 w-1/3 h-1/3 bg-linear-to-bl from-primary/10 to-accent/5 rounded-full blur-3xl"></div>
+      <div className="absolute -z-10 bottom-0 left-0 w-1/4 h-1/4 bg-linear-to-tr from-secondary/10 to-primary/5 rounded-full blur-3xl"></div>
       
       <div className="relative z-10">
         <div className="inline-block px-3 py-1 mb-6 text-xs font-medium text-primary bg-primary/10 rounded-full">
@@ -57,8 +57,8 @@ export default function Hero() {
           <div className="relative h-96 flex items-center justify-center">
             <div className="w-64 h-72 bg-white rounded-xl soft-shadow flex flex-col items-center justify-center relative">
               {/* T-shirt design mockup with subtle details */}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-gray-50 rounded-xl"></div>
-              <div className="w-40 h-40 bg-gradient-to-br from-primary/5 to-accent/5 rounded-full absolute top-6"></div>
+              <div className="absolute inset-0 bg-linear-to-b from-transparent to-gray-50 rounded-xl"></div>
+              <div className="w-40 h-40 bg-linear-to-br from-primary/5 to-accent/5 rounded-full absolute top-6"></div>
               <div className="text-primary font-medium z-10">T-SHIRT PREVIEW</div>
               <div className="text-xs text-muted mt-2 z-10">Your design here</div>
               

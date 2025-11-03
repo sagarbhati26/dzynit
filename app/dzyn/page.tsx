@@ -48,7 +48,7 @@ export default function DesignStudioPage() {
 
   // Auto-save functionality
   useEffect(() => {
-    let autoSaveTimer;
+    let autoSaveTimer: string | number | NodeJS.Timeout | undefined;
     
     if (unsavedChanges) {
       autoSaveTimer = setTimeout(() => {
@@ -331,25 +331,25 @@ export default function DesignStudioPage() {
             </p>
             <ol className="space-y-3 mb-6">
               <li className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">1</div>
+                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">1</div>
                 <div>
                   <strong>Choose your product</strong> - Select between T-shirts and hoodies
                 </div>
               </li>
               <li className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">2</div>
+                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">2</div>
                 <div>
                   <strong>Select a view</strong> - Design the front, back, or sides of your product
                 </div>
               </li>
               <li className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">3</div>
+                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">3</div>
                 <div>
                   <strong>Add elements</strong> - Drag images, text, or shapes onto your design
                 </div>
               </li>
               <li className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center flex-shrink-0">4</div>
+                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">4</div>
                 <div>
                   <strong>Customize</strong> - Resize, rotate, and adjust your design elements
                 </div>

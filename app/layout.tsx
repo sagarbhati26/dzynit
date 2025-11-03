@@ -13,7 +13,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen flex flex-col antialiased">
+      {/* suppressHydrationWarning only if a subtree is known to differ */}
+      <body className="min-h-screen flex flex-col antialiased" suppressHydrationWarning>
         <Navbar />
         <main className="flex-1">{children}</main>
         <footer className="py-8 text-center text-sm text-muted/80 border-t border-transparent/10">

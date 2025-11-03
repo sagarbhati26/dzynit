@@ -1,6 +1,23 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, ChangeEvent, DragEvent } from "react";
+
+// Define types for our data structures
+interface DesignElement {
+  id: string;
+  name: string;
+  icon?: string;
+  url?: string;
+  file?: File;
+  type?: string;
+}
+
+interface UploadedImage {
+  id: string;
+  name: string;
+  url: string;
+  file: File;
+}
 
 interface DesignSidebarProps {
   onAddElement?: (element: any) => void;
@@ -18,9 +35,9 @@ export default function DesignSidebar({
   const [fontSize, setFontSize] = useState(24);
   const [fontWeight, setFontWeight] = useState("normal");
   const [textColor, setTextColor] = useState("#000000");
-  const [uploadedImages, setUploadedImages] = useState([]);
+  const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   const tabs = [
     { id: "elements", label: "Elements", icon: "layers" },
@@ -80,22 +97,22 @@ export default function DesignSidebar({
   ];
 
   // Handle file upload
-  const handleFileUpload = (e) => {
+  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files.length > 0) {
+    if (files && files.length > 0) {
       const newImages = Array.from(files).map(file => ({
         id: Math.random().toString(36).substr(2, 9),
         name: file.name,
         url: URL.createObjectURL(file),
         file
-      }));
+      })) as UploadedImage[];
       
       setUploadedImages([...uploadedImages, ...newImages]);
     }
   };
 
   // Handle drag events
-  const handleDragOver = (e) => {
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(true);
   };
@@ -104,7 +121,7 @@ export default function DesignSidebar({
     setIsDragging(false);
   };
 
-  const handleDrop = (e) => {
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
     
@@ -115,7 +132,7 @@ export default function DesignSidebar({
         name: file.name,
         url: URL.createObjectURL(file),
         file
-      }));
+      })) as UploadedImage[];
       
       setUploadedImages([...uploadedImages, ...newImages]);
     }
@@ -138,8 +155,19 @@ export default function DesignSidebar({
   };
 
   // Handle dragging elements to canvas
-  const handleElementDragStart = (e, element) => {
-    e.dataTransfer.setData("application/json", JSON.stringify(element));
+  const handleElementDragStart = (e: DragEvent<HTMLDivElement>, element: DesignElement) => {
+    const payload = {
+      type: element.url ? 'image' : 'shape',
+      name: element.name,
+      url: element.url || '',
+      width: 100,
+      height: 100,
+      content: element.name || ''
+    };
+
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData("application/json", JSON.stringify(payload));
+    e.dataTransfer.setData("text/plain", JSON.stringify(payload));
   };
 
   const renderTabContent = () => {
@@ -159,7 +187,7 @@ export default function DesignSidebar({
                     <div 
                       key={item.id}
                       draggable
-                      onDragStart={(e) => handleElementDragStart(e, item)}
+                      onDragStart={(e: DragEvent<HTMLDivElement>) => handleElementDragStart(e, item)}
                       className="aspect-square rounded-lg border border-border bg-background/50 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
                     >
                       <span className="text-lg">{item.icon}</span>
@@ -224,7 +252,7 @@ export default function DesignSidebar({
           <div className="space-y-4">
             <div 
               className={`border-2 border-dashed ${isDragging ? 'border-primary bg-primary/5' : 'border-border'} rounded-xl p-6 text-center hover:border-primary/50 transition-colors cursor-pointer`}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -257,7 +285,7 @@ export default function DesignSidebar({
                       key={image.id}
                       className="aspect-square rounded-md border border-border bg-background/50 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors overflow-hidden relative group"
                       draggable
-                      onDragStart={(e) => handleElementDragStart(e, image)}
+                      onDragStart={(e: DragEvent<HTMLDivElement>) => handleElementDragStart(e, image)}
                     >
                       <img 
                         src={image.url} 
@@ -509,7 +537,7 @@ export default function DesignSidebar({
                   key={template.id}
                   className="rounded-lg border border-border overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
                 >
-                  <div className="aspect-[3/4] bg-background/50 flex items-center justify-center text-3xl">
+                  <div className="aspect-3/4 bg-background/50 flex items-center justify-center text-3xl">
                     {template.thumbnail}
                   </div>
                   <div className="p-2 text-xs font-medium">{template.name}</div>
