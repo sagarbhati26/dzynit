@@ -40,42 +40,14 @@ export default function DesignSidebar({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   const tabs = [
-    { id: "elements", label: "Elements", icon: "layers" },
+    
     { id: "uploads", label: "Uploads", icon: "image" },
     { id: "text", label: "Text", icon: "type" },
     { id: "templates", label: "Templates", icon: "layout" },
   ];
 
   // Mock elements for demonstration
-  const elementCategories = [
-    { 
-      name: "Shapes", 
-      items: [
-        { id: "circle", name: "Circle", icon: "○" },
-        { id: "square", name: "Square", icon: "□" },
-        { id: "triangle", name: "Triangle", icon: "△" },
-        { id: "hexagon", name: "Hexagon", icon: "⬡" }
-      ]
-    },
-    { 
-      name: "Icons", 
-      items: [
-        { id: "star", name: "Star", icon: "★" },
-        { id: "heart", name: "Heart", icon: "♥" },
-        { id: "arrow", name: "Arrow", icon: "→" },
-        { id: "check", name: "Check", icon: "✓" }
-      ]
-    },
-    { 
-      name: "Decorations", 
-      items: [
-        { id: "dots", name: "Dots", icon: "⋮" },
-        { id: "lines", name: "Lines", icon: "≡" },
-        { id: "waves", name: "Waves", icon: "∿" },
-        { id: "zigzag", name: "Zigzag", icon: "∿" }
-      ]
-    }
-  ];
+  
 
   // Mock fonts for demonstration
   const fonts = [
@@ -179,23 +151,7 @@ export default function DesignSidebar({
               <p className="text-sm text-muted">Drag elements to your design</p>
             </div>
             
-            {elementCategories.map((category) => (
-              <div key={category.name} className="space-y-3">
-                <h5 className="text-sm font-medium">{category.name}</h5>
-                <div className="grid grid-cols-4 gap-2">
-                  {category.items.map((item) => (
-                    <div 
-                      key={item.id}
-                      draggable
-                      onDragStart={(e: DragEvent<HTMLDivElement>) => handleElementDragStart(e, item)}
-                      className="aspect-square rounded-lg border border-border bg-background/50 flex items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
-                    >
-                      <span className="text-lg">{item.icon}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+           
             
             <div className="mt-4 p-3 rounded-lg border border-border bg-background/50">
               <h5 className="text-sm font-medium mb-2">Element Properties</h5>
