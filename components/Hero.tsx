@@ -15,7 +15,7 @@ export default function Hero() {
           <span className="text-gradient">Design.</span> Publish. <span className="text-gradient">Sell.</span>
         </h1>
         <p className="mt-6 text-lg text-muted max-w-xl leading-relaxed">
-          DzynIt is a minimalist studio for creators — design premium tees &
+          Dzyn is a minimalist studio for creators — design premium tees &
           hoodies, save drafts, and publish to the marketplace with just a few clicks.
         </p>
 

@@ -1,30 +1,38 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import GradientMaterial from "../GradientEditor/gradientShaderMaterial";
 
-interface GradientProductProps {
-  productType: string;
-  gradient: {
-    stops: { id: string; color: string; pos: number }[];
-    angle: number;
-    center: { x: number; y: number };
-  };
+export type MeshInfo = {
+  mesh: THREE.Mesh;
+  material: THREE.Material | THREE.Material[];
+};
+
+export interface ProductModelProps {
+  productType: "tshirt" | "hoodie" | string;
+  scale?: number;
+  /**
+   * Called when the model and its meshes are ready. Receives an array of meshes
+   * (useful to inject gradient textures or patch shaders later).
+   */
+  onModelReady?: (meshes: MeshInfo[]) => void;
 }
 
-export default function GradientProductModel({ productType, gradient }: GradientProductProps) {
-  const file =
-    productType === "hoodie"
-      ? "/assets/hoodie.glb"
-      : "/assets/tshirt.glb";
+/**
+ * ProductModel: Loads the GLB and preserves original PBR materials.
+ * It centers the model, ensures shadows are enabled and exposes mesh refs
+ * via onModelReady so callers can later inject gradient textures or patch
+ * material shaders with onBeforeCompile.
+ */
+const ProductModel = forwardRef(function ProductModel(
+  { productType = "tshirt", scale = 1, onModelReady }: ProductModelProps,
+  ref
+) {
+  const file = productType === "hoodie" ? "/assets/hoodie.glb" : "/assets/tshirt.glb";
+  const gltf = useGLTF(file) as any;
+  const scene = gltf?.scene;
+  const meshesRef = useRef<MeshInfo[]>([]);
 
-  const gltf = useGLTF(file);
-  const scene = gltf.scene;
-
-  // store ALL meshes
-  const meshRefs = useRef<THREE.Mesh[]>([]);
-
-  // 1️⃣ APPLY SHADER ONCE WHEN MODEL LOADS
+  // center + prepare model once loaded
   useEffect(() => {
     if (!scene) return;
 
@@ -33,64 +41,42 @@ export default function GradientProductModel({ productType, gradient }: Gradient
     const center = box.getCenter(new THREE.Vector3());
     scene.position.sub(center);
 
-    meshRefs.current = []; // clear old refs
+    meshesRef.current = [];
 
-    scene.traverse((child) => {
+    // traverse and collect meshes
+    scene.traverse((child: any) => {
       if (child.isMesh) {
-        const mesh = child as THREE.Mesh;
+        const mesh: THREE.Mesh = child as THREE.Mesh;
 
-        console.log("Applying shader to:", mesh.name);
-
-        // skip meshes without UVs
+        // ensure UVs exist — if not, log a warning but still keep the material
         if (!mesh.geometry.attributes.uv) {
-          console.warn("Mesh has no UVs:", mesh.name);
-          return;
+          console.warn("ProductModel: mesh has no UVs:", mesh.name);
         }
 
-        if (Array.isArray(mesh.material)) {
-          mesh.material = mesh.material.map(() => new GradientMaterial());
-        } else {
-          mesh.material = new GradientMaterial();
-        }
-
-        mesh.material.needsUpdate = true;
+        // Preserve existing material (do NOT replace it). This keeps base color, normal, AO etc.
+        // Ensure shadow reception and casting
         mesh.castShadow = true;
         mesh.receiveShadow = true;
 
-        meshRefs.current.push(mesh);
+        meshesRef.current.push({ mesh, material: mesh.material });
       }
     });
-  }, [scene]);
 
-  // 2️⃣ UPDATE SHADER UNIFORMS ON EVERY GRADIENT CHANGE
-  useEffect(() => {
-    meshRefs.current.forEach((mesh) => {
-      const material = mesh.material as any;
+    // notify parent that model is ready
+    onModelReady?.(meshesRef.current);
+  }, [scene, onModelReady]);
 
-      if (!material) return;
+  // Expose helper methods if parent uses a ref (optional)
+  useImperativeHandle(ref, () => ({
+    getMeshes: () => meshesRef.current,
+  }));
 
-      const stops = gradient.stops.slice(0, 8);
+  if (!scene) return null;
 
-      material.stopCount = stops.length;
-      material.angle = gradient.angle;
-      material.center = new THREE.Vector2(gradient.center.x, gradient.center.y);
-
-      for (let i = 0; i < 8; i++) {
-        if (i < stops.length) {
-          material.stopColors[i] = new THREE.Color(stops[i].color);
-          material.stopPositions[i] = stops[i].pos;
-        } else {
-          material.stopColors[i] = new THREE.Color(1, 1, 1);
-          material.stopPositions[i] = 0;
-        }
-      }
-
-      material.needsUpdate = true;
-    });
-  }, [gradient]);
-
-  return <primitive object={scene} scale={1} />;
-}
+  return <primitive object={scene} scale={scale} />;
+});
 
 useGLTF.preload("/assets/tshirt.glb");
 useGLTF.preload("/assets/hoodie.glb");
+
+export default ProductModel;

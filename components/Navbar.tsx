@@ -31,7 +31,7 @@ export default function Navbar() {
               DZ
             </div>
             <div>
-              <div className="font-semibold">DzynIt</div>
+              <div className="font-semibold">Dzyn</div>
               <div className="text-xs text-muted -mt-0.5">
                 design & marketplace
               </div>

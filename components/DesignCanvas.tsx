@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useRef, Suspense } from "react";
+import { useState, useRef, Suspense, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
-
-// Corrected imports
-//import GradientEditor from "./GradientEditor/GradientEditor";
 import GradientEditor from "./GradientEditor/GradientEditor";
-import GradientProductModel from "./Product model/GradientProductModel";
-//import GradientProductModel from "./ProductModel/GradientProductModel";
+import ProductModel from "./Product model/GradientProductModel";
+import { applyGradientToMeshes } from "./GradientPoints/GradientOverlay";
+import type { ControlPoint } from "./GradientPoints/GradientTexture";
 
 interface DesignElement {
   id: string;
@@ -65,6 +63,9 @@ export default function DesignCanvas({
     center: { x: 0.5, y: 0.5 },
   });
 
+  const modelMeshesRef = useRef<{ mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[]>([]);
+  const [controlPoints, setControlPoints] = useState<ControlPoint[]>([]);
+
   // Raycaster + mouse (Batch 4)
   const raycaster = useRef(new THREE.Raycaster());
   const mouse = useRef(new THREE.Vector2());
@@ -72,20 +73,15 @@ export default function DesignCanvas({
   // ⭐ CLICK HANDLER (Batch 4)
   const handleClickOnModel = (event: any) => {
     if (!event.intersections || event.intersections.length === 0) return;
-
     const intersect = event.intersections[0];
-
     if (!intersect.uv) return;
 
-    const uv = intersect.uv;
-
-    setGradientData((prev) => ({
-      ...prev,
-      center: {
-        x: uv.x,
-        y: uv.y,
-      },
-    }));
+    const newPoint: ControlPoint = {
+      uv: { x: intersect.uv.x, y: intersect.uv.y },
+      color: "#ff5722",
+      radius: 0.2
+    };
+    setControlPoints(prev => [...prev, newPoint]);
   };
 
   // Drag + Drop (unchanged)
@@ -131,6 +127,12 @@ export default function DesignCanvas({
     setUnsavedChanges(true);
   };
 
+  // Gradient mesh effect
+  useEffect(() => {
+    if (!modelMeshesRef.current || modelMeshesRef.current.length === 0) return;
+    applyGradientToMeshes(modelMeshesRef.current, controlPoints, 0.8);
+  }, [controlPoints]);
+
   // Color list (still used for solid background tone)
   const colors = [
     { name: "White", value: "white", hex: "#ffffff" },
@@ -149,16 +151,22 @@ export default function DesignCanvas({
       <div className="w-full h-full" style={{ backgroundColor: "#4a4a4a" }}>
         <Canvas
           camera={{ fov: 50 }}
-          onPointerDown={(e) => handleClickOnModel(e)} // ⭐ Click to move gradient
+          onPointerDown={(e) => handleClickOnModel(e)} // ⭐ Click to add control point
         >
           <ambientLight intensity={0.8} />
           <directionalLight position={[10, 10, 5]} intensity={1} />
           <pointLight position={[-10, -10, -10]} intensity={0.5} />
 
           <Suspense fallback={null}>
-            <GradientProductModel
+            <ProductModel
               productType={productType}
-              gradient={gradientData}
+              scale={1}
+              onModelReady={(meshes) => {
+                modelMeshesRef.current = meshes;
+                if (controlPoints.length > 0) {
+                  applyGradientToMeshes(modelMeshesRef.current, controlPoints, 0.8);
+                }
+              }}
             />
           </Suspense>
 
