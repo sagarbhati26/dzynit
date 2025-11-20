@@ -10,19 +10,11 @@ export type MeshInfo = {
 export interface ProductModelProps {
   productType: "tshirt" | "hoodie" | string;
   scale?: number;
-  /**
-   * Called when the model and its meshes are ready. Receives an array of meshes
-   * (useful to inject gradient textures or patch shaders later).
-   */
+  
   onModelReady?: (meshes: MeshInfo[]) => void;
 }
 
-/**
- * ProductModel: Loads the GLB and preserves original PBR materials.
- * It centers the model, ensures shadows are enabled and exposes mesh refs
- * via onModelReady so callers can later inject gradient textures or patch
- * material shaders with onBeforeCompile.
- */
+
 const ProductModel = forwardRef(function ProductModel(
   { productType = "tshirt", scale = 1, onModelReady }: ProductModelProps,
   ref

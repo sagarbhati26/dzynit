@@ -1,62 +1,53 @@
+// GradientOverlay.ts
 import * as THREE from "three";
-import { generateGradientTexture, ControlPoint } from "./GradientTexture";
+import GradientPainter from "./GradientPainter";
 import { patchMaterialWithGradient } from "./PBRMaterialPatcher";
 
-let currentTexture: THREE.Texture | null = null;
+let painter: GradientPainter | null = null;
 
-/**
- * Apply a gradient (from points) to a list of MeshInfo items.
- * - meshes: array of objects { mesh, material }
- * - points: array of control points (uv, color, radius)
- * - strength: blend strength 0..1
- */
+export function getPainter(size = 2048) {
+  if (!painter) painter = new GradientPainter(size);
+  return painter;
+}
+
 export function applyGradientToMeshes(
   meshes: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[],
-  points: ControlPoint[],
-  strength: number = 0.8,
-  size: number = 1024
+  controlPoints: any[],
+  strength = 0.9
 ) {
-  // dispose previous texture
-  if (currentTexture) {
-    currentTexture.dispose();
-    currentTexture = null;
-  }
+  const p = getPainter();
 
-  if (!points || points.length === 0) {
-    return;
-  }
+  // Clear and apply control points
+  p.clear();
+  controlPoints.forEach((pt) => {
+    p.paintSpot(pt.uv.x, pt.uv.y, pt.color, pt.radius, 0.6);
+  });
 
-  // generate a new gradient texture (UV-space)
-  if (typeof window === "undefined") return; // server guard
-  const tex = generateGradientTexture(points, size);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.flipY = false;
+  const tex = p.getTexture();
   tex.needsUpdate = true;
-  currentTexture = tex;
 
-  // patch all mesh materials that are MeshStandardMaterial
-  meshes.forEach((entry) => {
-    const mesh = entry.mesh;
-    // handle array of materials too
+  meshes.forEach(({ mesh }) => {
     if (Array.isArray(mesh.material)) {
-      mesh.material.forEach((mat: any) => {
-        if (mat && mat.isMeshStandardMaterial) {
-          patchMaterialWithGradient(mat as THREE.MeshStandardMaterial, tex, strength);
+      mesh.material.forEach((m: any) => {
+        if (m.isMeshStandardMaterial) {
+          patchMaterialWithGradient(m, tex, strength);
         }
       });
     } else {
-      const mat: any = mesh.material;
-      if (mat && mat.isMeshStandardMaterial) {
-        patchMaterialWithGradient(mat as THREE.MeshStandardMaterial, tex, strength);
+      const m: any = mesh.material;
+      if (m.isMeshStandardMaterial) {
+        patchMaterialWithGradient(m, tex, strength);
       }
     }
   });
 }
 
-export function clearGradient() {
-  if (currentTexture) {
-    currentTexture.dispose();
-    currentTexture = null;
-  }
+export function paintBrush(u: number, v: number, color: string, radius: number, hardness = 0.6) {
+  const p = getPainter();
+  p.paintSpot(u, v, color, radius, hardness);
+}
+
+export function exportTexturePNG() {
+  if (!painter) return null;
+  return painter.toPNG();
 }
