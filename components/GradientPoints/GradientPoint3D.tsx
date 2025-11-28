@@ -43,6 +43,7 @@ export default function GradientPoint3D({
   return (
     <mesh
       ref={ref}
+      raycast={() => {}}
       position={[worldPos.x, worldPos.y, worldPos.z]}
       onPointerDown={(e) => {
         // stop event from hitting model behind

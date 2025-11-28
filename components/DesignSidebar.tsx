@@ -113,15 +113,15 @@ export default function DesignSidebar({
   // Handle adding text to canvas
   const handleAddText = () => {
     if (text.trim()) {
-      // In a real implementation, this would add text to the canvas
-      console.log("Adding text:", {
-        text,
-        fontSize,
-        fontWeight,
-        color: textColor
-      });
-      
-      // Reset text input
+      const payload = {
+        id: Math.random().toString(36).substr(2, 9),
+        type: "text",
+        content: text,
+        width: fontSize,
+        rotation: 0,
+        color: textColor,
+      };
+      onAddElement(payload);
       setText("");
     }
   };

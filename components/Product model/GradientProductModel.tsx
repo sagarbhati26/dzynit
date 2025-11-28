@@ -10,10 +10,8 @@ export type MeshInfo = {
 export interface ProductModelProps {
   productType: "tshirt" | "hoodie" | string;
   scale?: number;
-  
   onModelReady?: (meshes: MeshInfo[]) => void;
 }
-
 
 const ProductModel = forwardRef(function ProductModel(
   { productType = "tshirt", scale = 1, onModelReady }: ProductModelProps,
@@ -22,50 +20,50 @@ const ProductModel = forwardRef(function ProductModel(
   const file = productType === "hoodie" ? "/assets/hoodie.glb" : "/assets/tshirt.glb";
   const gltf = useGLTF(file) as any;
   const scene = gltf?.scene;
+
+  const modelGroupRef = useRef<THREE.Group>(null);
   const meshesRef = useRef<MeshInfo[]>([]);
 
-  // center + prepare model once loaded
   useEffect(() => {
-    if (!scene) return;
+    if (!scene || !modelGroupRef.current) return;
 
-    // center model
     const box = new THREE.Box3().setFromObject(scene);
     const center = box.getCenter(new THREE.Vector3());
     scene.position.sub(center);
 
     meshesRef.current = [];
 
-    // traverse and collect meshes
     scene.traverse((child: any) => {
       if (child.isMesh) {
-        const mesh: THREE.Mesh = child as THREE.Mesh;
+        const mesh: THREE.Mesh = child;
 
-        // ensure UVs exist — if not, log a warning but still keep the material
         if (!mesh.geometry.attributes.uv) {
           console.warn("ProductModel: mesh has no UVs:", mesh.name);
         }
 
-        // Preserve existing material (do NOT replace it). This keeps base color, normal, AO etc.
-        // Ensure shadow reception and casting
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        mesh.raycast = THREE.Mesh.prototype.raycast;  // 🔥 IMPORTANT: ensure raycasting works
 
         meshesRef.current.push({ mesh, material: mesh.material });
       }
     });
 
-    // notify parent that model is ready
     onModelReady?.(meshesRef.current);
   }, [scene, onModelReady]);
 
-  // Expose helper methods if parent uses a ref (optional)
   useImperativeHandle(ref, () => ({
     getMeshes: () => meshesRef.current,
+    group: modelGroupRef.current
   }));
 
   if (!scene) return null;
 
-  return <primitive object={scene} scale={scale} />;
+  return (
+    <group ref={modelGroupRef}>
+      <primitive object={scene} scale={scale} />
+    </group>
+  );
 });
 
 useGLTF.preload("/assets/tshirt.glb");

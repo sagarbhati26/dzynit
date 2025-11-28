@@ -10,6 +10,7 @@ import {
   applyGradientToMeshes,
   paintBrush,
   exportTexturePNG,
+  getPainter,
 } from "./GradientPoints/GradientOverlay";
 import type { ControlPoint as BaseControlPoint } from "./GradientPoints/GradientTexture";
 import GradientPoint3D from "./GradientPoints/GradientPoint3D";
@@ -18,12 +19,13 @@ interface DesignElement {
   id: string;
   type: string;
   content: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  view: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  rotation?: number;
+  view?: string;
+  color?: string;
   url?: string;
   dropCanvasWidth?: number;
   dropCanvasHeight?: number;
@@ -41,7 +43,6 @@ interface DesignCanvasProps {
   setUnsavedChanges?: (value: boolean) => void;
 }
 
-// Local point type extends the basic ControlPoint with world position
 type ControlPoint = BaseControlPoint & { worldPos: THREE.Vector3 };
 
 export default function DesignCanvas({
@@ -66,46 +67,72 @@ export default function DesignCanvas({
   const [controlPoints, setControlPoints] = useState<ControlPoint[]>([]);
 
   // painting & tool state
-  const [toolMode, setToolMode] = useState<"point" | "brush">("point");
+  const [toolMode, setToolMode] = useState<"point" | "brush" | "text">("point");
   const [brushColor, setBrushColor] = useState("#ff5722");
   const [brushRadius, setBrushRadius] = useState(0.06);
   const [brushHardness, setBrushHardness] = useState(0.6);
 
   // selected index
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+  const [selectedTextIndex, setSelectedTextIndex] = useState<number | null>(null);
 
   // dragging state: index currently dragging (null if none)
   const draggingIndexRef = useRef<number | null>(null);
+  const draggingTextIndexRef = useRef<number | null>(null);
   const isPaintingRef = useRef(false);
-
-  // ---------------------
-  // Model ready callback
-  // ---------------------
   const onModelReady = (meshes: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[]) => {
     modelMeshesRef.current = meshes;
-    // ensure the gradient is applied if points already exist
     if (controlPoints.length > 0) {
       applyGradientToMeshes(modelMeshesRef.current, controlPoints, 0.9);
+      const p = getPainter();
+      designElements
+        .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
+        .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
     }
   };
-
-  // ---------------------
-  // Re-apply gradient when points change
-  // ---------------------
   useEffect(() => {
     if (!modelMeshesRef.current || modelMeshesRef.current.length === 0) return;
-    // generate painter-based texture from controlPoints (painter draws the points)
-    // applyGradientToMeshes expects plain control points (uv,color,radius)
     applyGradientToMeshes(
       modelMeshesRef.current,
       controlPoints.map((p) => ({ uv: p.uv, color: p.color, radius: p.radius })),
       0.9
     );
-  }, [controlPoints]);
+    const p = getPainter();
+    designElements
+      .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
+      .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
+  }, [controlPoints, designElements]);
 
-  // ---------------------
-  // Helper: add point from an intersection
-  // ---------------------
+  useEffect(() => {
+    if (!modelMeshesRef.current || modelMeshesRef.current.length === 0) return;
+    const col = new THREE.Color(selectedColor);
+    modelMeshesRef.current.forEach(({ mesh }) => {
+      if (Array.isArray(mesh.material)) {
+        (mesh.material as any[]).forEach((m: any) => {
+          if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+            m.color.copy(col);
+            m.needsUpdate = true;
+          }
+        });
+      } else {
+        const m: any = mesh.material;
+        if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
+          m.color.copy(col);
+          m.needsUpdate = true;
+        }
+      }
+    });
+    applyGradientToMeshes(
+      modelMeshesRef.current,
+      controlPoints.map((p) => ({ uv: p.uv, color: p.color, radius: p.radius })),
+      0.9
+    );
+    const p = getPainter();
+    designElements
+      .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
+      .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
+  }, [selectedColor, designElements]);
+
   const addPointFromIntersection = (inter: any) => {
     if (!inter || !inter.uv) return;
     const uv = { x: inter.uv.x, y: inter.uv.y };
@@ -120,12 +147,9 @@ export default function DesignCanvas({
     setSelectedPointIndex(controlPoints.length);
   };
 
-  // ---------------------
-  // Canvas pointer handlers (used for painting & adding points)
-  // these run inside R3F Canvas context
-  // ---------------------
   const handlePointerDown = (e: any) => {
-    // pointer events inside R3F provide intersections
+    console.log("PointerDown event:", e);
+console.log("Intersections:", e.intersections);
     if (!e.intersections || e.intersections.length === 0) return;
     const inter = e.intersections[0];
 
@@ -137,14 +161,31 @@ export default function DesignCanvas({
 
     if (toolMode === "point") {
       addPointFromIntersection(inter);
+    } else if (toolMode === "text") {
+      if (!inter.uv) return;
+      let idx = selectedTextIndex;
+      if (idx === null) {
+        const lastTextIndex = [...designElements].map((e, i) => ({ e, i })).filter((x) => x.e.type === "text").map((x) => x.i).pop();
+        if (lastTextIndex === undefined) return;
+        idx = lastTextIndex;
+        setSelectedTextIndex(idx);
+      }
+      setDesignElements((prev) => prev.map((e, i) => (i === (idx as number) ? { ...e, x: inter.uv.x, y: inter.uv.y, rotation: e.rotation || 0 } : e)) as any);
+      draggingTextIndexRef.current = idx as number;
+      const p = getPainter();
+      designElements
+        .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
+        .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
     } else {
-      // brush mode: begin painting
       isPaintingRef.current = true;
       if (inter.uv) {
         paintBrush(inter.uv.x, inter.uv.y, brushColor, brushRadius, brushHardness);
-        // reapply painter texture onto materials
         if (modelMeshesRef.current.length) {
           applyGradientToMeshes(modelMeshesRef.current, controlPoints.map((p) => ({ uv: p.uv, color: p.color, radius: p.radius })), 0.9);
+          const p = getPainter();
+          designElements
+            .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
+            .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
         }
       }
     }
@@ -165,36 +206,43 @@ export default function DesignCanvas({
       return;
     }
 
-    // painting
+    const draggingText = draggingTextIndexRef.current;
+    if (draggingText !== null) {
+      const targetInter = (e.intersections || []).find((it: any) => !it.object?.userData?.isHandle && it.uv);
+      if (!targetInter) return;
+      const { uv } = targetInter;
+      setDesignElements((prev) => prev.map((el, i) => (i === draggingText ? { ...el, x: uv.x, y: uv.y } : el)) as any);
+      const p = getPainter();
+      designElements
+        .filter((de) => de.type === "text" && de.x !== undefined && de.y !== undefined)
+        .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
+      return;
+    }
+
     if (!isPaintingRef.current) return;
     const inter = (e.intersections || [])[0];
     if (!inter || !inter.uv) return;
     paintBrush(inter.uv.x, inter.uv.y, brushColor, brushRadius, brushHardness);
     if (modelMeshesRef.current.length) {
       applyGradientToMeshes(modelMeshesRef.current, controlPoints.map((p) => ({ uv: p.uv, color: p.color, radius: p.radius })), 0.9);
+      const p = getPainter();
+      designElements
+        .filter((de) => de.type === "text" && de.x !== undefined && de.y !== undefined)
+        .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
     }
   };
 
   const handlePointerUp = (e: any) => {
-    // stop painting and dragging
     isPaintingRef.current = false;
     draggingIndexRef.current = null;
+    draggingTextIndexRef.current = null;
   };
-
-  // ---------------------
-  // Handle starting a drag on a sphere handle
-  // We don't implement the dragging inside the handle component — we start it here.
-  // ---------------------
   const startHandleDrag = (index: number, e: any) => {
     e.stopPropagation();
     draggingIndexRef.current = index;
     // also mark selected
     setSelectedPointIndex(index);
   };
-
-  // ---------------------
-  // Export UV texture
-  // ---------------------
   const exportUVTexture = () => {
     const url = exportTexturePNG();
     if (!url) return;
@@ -203,10 +251,6 @@ export default function DesignCanvas({
     a.download = "uv-gradient.png";
     a.click();
   };
-
-  // ---------------------
-  // Render 3D Canvas + Points inside Canvas
-  // ---------------------
   const render3DProductShape = () => {
     return (
       <div className="w-full h-full" style={{ backgroundColor: "#2b2b2b" }}>
@@ -241,15 +285,13 @@ export default function DesignCanvas({
             );
           })}
 
-          <OrbitControls ref={model3DRef} enablePan={false} />
+          <OrbitControls ref={model3DRef} enablePan={false} makeDefault/>
         </Canvas>
       </div>
     );
   };
 
-  // ---------------------
-  // Normal canvas UI + point editor
-  // ---------------------
+
   return (
     <div className="flex flex-row h-full">
       {/* LEFT: 3D */}
@@ -274,8 +316,6 @@ export default function DesignCanvas({
           />
         </div> */}
       </div>
-
-      {/* RIGHT: Tools */}
       <div className="w-80 p-4  border-l overflow-auto">
         <h2 className="text-lg font-semibold mb-3">Design Tools</h2>
 
@@ -291,6 +331,12 @@ export default function DesignCanvas({
             className={`px-3 py-1 rounded ${toolMode === "brush" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
           >
             Brush
+          </button>
+          <button
+            onClick={() => setToolMode("text")}
+            className={`px-3 py-1 rounded ${toolMode === "text" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+          >
+            Text
           </button>
           <button onClick={exportUVTexture} className="px-3 py-1 rounded bg-gray-100">Export UV</button>
         </div>
@@ -324,6 +370,11 @@ export default function DesignCanvas({
           />
         </div>
 
+        <div className="mb-3">
+          <label className="block text-sm">Garment Color</label>
+          <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} />
+        </div>
+
         <hr className="my-3" />
 
         <h3 className="font-semibold">Points ({controlPoints.length})</h3>
@@ -350,7 +401,29 @@ export default function DesignCanvas({
                       type="color"
                       value={p.color}
                       onChange={(e) =>
-                        setControlPoints((prev) => prev.map((x, idx) => (idx === i ? { ...x, color: e.target.value } : x)))
+                        setControlPoints((prev) => {
+                          const next = prev.map((x, idx) =>
+                            idx === i
+                              ? { ...x, color: e.target.value, worldPos: x.worldPos.clone() }
+                              : x
+                          );
+
+                          setTimeout(() => {
+                            if (modelMeshesRef.current.length) {
+                              applyGradientToMeshes(
+                                modelMeshesRef.current,
+                                next.map((p) => ({
+                                  uv: p.uv,
+                                  color: p.color,
+                                  radius: p.radius,
+                                })),
+                                0.9
+                              );
+                            }
+                          }, 0);
+
+                          return next;
+                        })
                       }
                     />
                   </div>
@@ -364,7 +437,29 @@ export default function DesignCanvas({
                       step="0.01"
                       value={p.radius}
                       onChange={(e) =>
-                        setControlPoints((prev) => prev.map((x, idx) => (idx === i ? { ...x, radius: Number(e.target.value) } : x)))
+                        setControlPoints((prev) => {
+                          const next = prev.map((x, idx) =>
+                            idx === i
+                              ? { ...x, radius: Number(e.target.value), worldPos: x.worldPos.clone() }
+                              : x
+                          );
+
+                          setTimeout(() => {
+                            if (modelMeshesRef.current.length) {
+                              applyGradientToMeshes(
+                                modelMeshesRef.current,
+                                next.map((p) => ({
+                                  uv: p.uv,
+                                  color: p.color,
+                                  radius: p.radius,
+                                })),
+                                0.9
+                              );
+                            }
+                          }, 0);
+
+                          return next;
+                        })
                       }
                     />
                   </div>
@@ -398,3 +493,4 @@ export default function DesignCanvas({
     </div>
   );
 }
+

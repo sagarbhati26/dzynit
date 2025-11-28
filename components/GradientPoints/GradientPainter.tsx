@@ -47,6 +47,34 @@ export class GradientPainter {
     this.texture.needsUpdate = true;
   }
 
+  // Draw text (UV-based)
+  drawText(
+    u: number,
+    v: number,
+    text: string,
+    fontSize: number = 64,
+    color: string = "#000000",
+    fontWeight: string = "normal",
+    rotationDeg: number = 0,
+    align: CanvasTextAlign = "center"
+  ) {
+    const x = u * this.size;
+    const y = (1 - v) * this.size;
+
+    this.ctx.save();
+    this.ctx.translate(x, y);
+    this.ctx.rotate((rotationDeg * Math.PI) / 180);
+    this.ctx.textAlign = align;
+    this.ctx.textBaseline = "middle";
+    this.ctx.font = `${fontWeight} ${Math.max(8, fontSize)}px Inter, system-ui, sans-serif`;
+    this.ctx.fillStyle = color;
+    this.ctx.globalCompositeOperation = "source-over";
+    this.ctx.fillText(text, 0, 0);
+    this.ctx.restore();
+
+    this.texture.needsUpdate = true;
+  }
+
   // Clear
   clear() {
     this.ctx.clearRect(0, 0, this.size, this.size);
