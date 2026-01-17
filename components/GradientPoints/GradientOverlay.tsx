@@ -26,16 +26,17 @@ export function applyGradientToMeshes(
   const tex = p.getTexture();
   tex.needsUpdate = true;
 
+  const shouldPatch = (m: any) => m?.isMeshStandardMaterial || m?.isMeshPhysicalMaterial || typeof m?.onBeforeCompile === "function";
   meshes.forEach(({ mesh }) => {
     if (Array.isArray(mesh.material)) {
-      mesh.material.forEach((m: any) => {
-        if (m.isMeshStandardMaterial) {
+      (mesh.material as any[]).forEach((m: any) => {
+        if (shouldPatch(m) && !m.gradientPatched) {
           patchMaterialWithGradient(m, tex, strength);
         }
       });
     } else {
       const m: any = mesh.material;
-      if (m.isMeshStandardMaterial) {
+      if (shouldPatch(m) && !m.gradientPatched) {
         patchMaterialWithGradient(m, tex, strength);
       }
     }

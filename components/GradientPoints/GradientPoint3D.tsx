@@ -29,9 +29,9 @@ export default function GradientPoint3D({
   // make the sphere gently pulse to indicate it's interactive
   useFrame(({ clock }) => {
     if (!ref.current) return;
-    const t = 1 + Math.sin(clock.elapsedTime * 6) * 0.03;
-    const baseScale = Math.max(0.02, radius * 0.15);
-    ref.current.scale.setScalar(baseScale * t);
+    const t = 1 + Math.sin(clock.elapsedTime * 4) * 0.05;
+    // Scale handled visually
+    ref.current.scale.setScalar(t);
   });
 
   useEffect(() => {
@@ -41,34 +41,41 @@ export default function GradientPoint3D({
   }, []);
 
   return (
-    <mesh
-      ref={ref}
-      raycast={() => {}}
-      position={[worldPos.x, worldPos.y, worldPos.z]}
-      onPointerDown={(e) => {
-        // stop event from hitting model behind
-        e.stopPropagation();
-        // call parent to start dragging this handle
-        onPointerDown(index, e);
-      }}
-      // pointer cursor feedback
-      onPointerOver={(e) => {
-        document.body.style.cursor = "grab";
-      }}
-      onPointerOut={(e) => {
-        document.body.style.cursor = "default";
-      }}
-    >
-      <sphereGeometry args={[1, 24, 24]} />
-      <meshStandardMaterial
-        color={color}
-        emissive={selected ? new THREE.Color(color) : new THREE.Color(0x000000)}
-        emissiveIntensity={selected ? 0.6 : 0.15}
-        metalness={0.2}
-        roughness={0.5}
-        transparent={true}
-        opacity={0.95}
-      />
-    </mesh>
+    <group position={[worldPos.x, worldPos.y, worldPos.z]}>
+      {/* Selection Ring */}
+      {selected && (
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[radius * 0.2, radius * 0.25, 32]} />
+          <meshBasicMaterial color="white" opacity={0.8} transparent side={THREE.DoubleSide} />
+        </mesh>
+      )}
+
+      {/* Main Handle Sphere */}
+      <mesh
+        ref={ref}
+        scale={[radius * 0.15, radius * 0.15, radius * 0.15]}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onPointerDown(index, e);
+        }}
+        onPointerOver={() => {
+          document.body.style.cursor = "grab";
+        }}
+        onPointerOut={() => {
+          document.body.style.cursor = "default";
+        }}
+      >
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshPhysicalMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={selected ? 0.8 : 0.4}
+          roughness={0.2}
+          metalness={0.1}
+          clearcoat={1}
+          clearcoatRoughness={0.1}
+        />
+      </mesh>
+    </group>
   );
 }

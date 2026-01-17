@@ -3,7 +3,7 @@
 import DesignCanvas from "@/components/DesignCanvas";
 import DesignSidebar from "@/components/DesignSidebar";
 import Link from "next/link";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 export default function DesignStudioPage() {
   const [designName, setDesignName] = useState("Untitled Design");
@@ -12,15 +12,27 @@ export default function DesignStudioPage() {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [lastSaved, setLastSaved] = useState("Just now");
   const [showTutorial, setShowTutorial] = useState(true);
-  const [showKeyboardShortcuts, setShowKeyboardShortcuts] = useState(false);
-  const [designElements, setDesignElements] = useState([]);
+  const [designElements, setDesignElements] = useState<any[]>([]);
   const [productType, setProductType] = useState("tshirt");
   const [currentView, setCurrentView] = useState("front");
   const [selectedColor, setSelectedColor] = useState("black");
-  
+
   // Communication between sidebar and canvas
-  const handleAddElement = (element) => {
-    setDesignElements((prev) => [...prev, element]);
+  const handleAddElement = (element: any) => {
+    // If text, add to designElements
+    if (element.type === 'text') {
+      const newEl = {
+        ...element,
+        id: Math.random().toString(36).substr(2, 9),
+        x: 0.5,
+        y: 0.5,
+        position: [0, 0, 0.6],
+        rotationVector: [0, 0, 0],
+        view: currentView
+      };
+      setDesignElements((prev) => [...prev, newEl]);
+    }
+    // If image, handle image (not fully implemented in canvas yet but let's pass it)
     setUnsavedChanges(true);
   };
 
@@ -48,8 +60,8 @@ export default function DesignStudioPage() {
 
   // Auto-save functionality
   useEffect(() => {
-    let autoSaveTimer: string | number | NodeJS.Timeout | undefined;
-    
+    let autoSaveTimer: NodeJS.Timeout | undefined;
+
     if (unsavedChanges) {
       autoSaveTimer = setTimeout(() => {
         console.log("Auto-saving design...");
@@ -57,7 +69,7 @@ export default function DesignStudioPage() {
         setLastSaved("Just now");
       }, 30000); // Auto-save after 30 seconds of inactivity
     }
-    
+
     return () => {
       if (autoSaveTimer) clearTimeout(autoSaveTimer);
     };
@@ -65,398 +77,152 @@ export default function DesignStudioPage() {
 
   // Prompt user before leaving if there are unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e) => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (unsavedChanges) {
         e.preventDefault();
         e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
         return e.returnValue;
       }
     };
-    
+
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [unsavedChanges]);
 
   // Keyboard shortcuts
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Cmd/Ctrl + S to save
+    const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
       }
-      
-      // Cmd/Ctrl + P to publish
       if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
         e.preventDefault();
         handlePublish();
       }
-      
-      // Cmd/Ctrl + Z for undo (would need actual implementation)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-        e.preventDefault();
-        console.log("Undo action");
-      }
-      
-      // Cmd/Ctrl + Shift + Z for redo (would need actual implementation)
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z') {
-        e.preventDefault();
-        console.log("Redo action");
-      }
-      
-      // ? to toggle keyboard shortcuts
-      if (e.key === '?') {
-        setShowKeyboardShortcuts(prev => !prev);
-      }
     };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   return (
-    <div className="min-h-screen pt-20">
-      {/* Header */}
-      <div className="border-b border-border sticky top-20 bg-background z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="relative w-screen h-screen overflow-hidden bg-black text-foreground">
+
+      {/* 1. Background Canvas Layer */}
+      <div className="absolute inset-0 z-0">
+        <DesignCanvas
+          productType={productType}
+          currentView={currentView}
+          // setProductType={setProductType} // Removed from canvas props
+          // setCurrentView={setCurrentView} // Removed from canvas props
+          selectedColor={selectedColor}
+          setSelectedColor={setSelectedColor}
+          designElements={designElements}
+          setDesignElements={setDesignElements}
+          setUnsavedChanges={setUnsavedChanges}
+        />
+      </div>
+
+      {/* 2. Top Navigation (Floating) */}
+      <div className="absolute top-0 left-0 right-0 z-50 p-6 pointer-events-none">
+        <div className="flex justify-between items-center pointer-events-auto">
+          {/* Logo area */}
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-muted hover:text-foreground">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m12 19-7-7 7-7"></path>
-                <path d="M19 12H5"></path>
-              </svg>
-            </Link>
-            <div className="h-6 w-px bg-border"></div>
-            <div className="flex flex-col">
-              <input
-                type="text"
-                value={designName}
-                onChange={(e) => {
-                  setDesignName(e.target.value);
-                  setUnsavedChanges(true);
-                }}
-                className="text-lg font-medium bg-transparent border-none focus:outline-none focus:ring-0 p-0"
-              />
-              <div className="text-xs text-muted flex items-center gap-1">
-                {unsavedChanges ? (
-                  <span className="text-amber-500">Unsaved changes</span>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6 9 17l-5-5"></path>
-                    </svg>
-                    <span>Saved {lastSaved}</span>
-                  </>
-                )}
+            <Link href="/" className="flex items-center gap-2 group">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-all">
+                D
               </div>
+              <span className="font-bold text-xl tracking-tight text-white hidden md:block">dzyn<span className="text-indigo-400">it</span></span>
+            </Link>
+            <div className="h-6 w-px bg-white/10 mx-2 hidden md:block"></div>
+            <div className="hidden md:flex items-center gap-2">
+              <input
+                value={designName}
+                onChange={(e) => setDesignName(e.target.value)}
+                className="bg-transparent border-none text-white font-medium focus:ring-0 placeholder-gray-500 hover:bg-white/5 rounded px-2 py-1 transition-colors w-48"
+              />
+              <span className="text-xs text-gray-500">{unsavedChanges ? 'Unsaved changes' : `Saved ${lastSaved}`}</span>
             </div>
           </div>
-          
-          {/* Product type selector */}
-          <div className="hidden md:flex items-center gap-3 bg-background/50 px-3 py-1.5 rounded-lg border border-border">
-            <button 
-              onClick={() => {
-                setProductType("tshirt");
-                setUnsavedChanges(true);
-              }}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 ${productType === "tshirt" ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
-              </svg>
-              T-Shirt
-            </button>
-            <button 
-              onClick={() => {
-                setProductType("hoodie");
-                setUnsavedChanges(true);
-              }}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 ${productType === "hoodie" ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"></path>
-                <path d="M12 2v5"></path>
-                <path d="M6 10v4a6 6 0 0 0 12 0v-4"></path>
-              </svg>
-              Hoodie
-            </button>
-          </div>
-          
+
+          {/* View Controls & Action Buttons */}
           <div className="flex items-center gap-3">
-            <div className="text-sm text-muted mr-2 hidden sm:block">
-              <button 
-                className="text-primary hover:underline flex items-center gap-1"
-                onClick={() => {
-                  // Preview functionality would be implemented here
-                  console.log("Preview design");
-                }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
-                  <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-                Preview
-              </button>
-            </div>
-            <button 
+            {/* View Switcher */}
+            {/* <div className="glass-panel p-1 rounded-lg flex gap-1">
+              {['front', 'back', 'left', 'right'].map((view) => (
+                <button
+                  key={view}
+                  onClick={() => setCurrentView(view)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-all ${currentView === view ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                >
+                  {view}
+                </button>
+              ))}
+            </div> */}
+
+            <div className="w-px h-6 bg-white/10 mx-2"></div>
+
+            <button
               onClick={handleSave}
-              className="px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-background/80 transition-colors flex items-center gap-2"
               disabled={isSaving}
+              className="glass-button px-4 py-2 rounded-lg text-sm font-medium text-white hover:bg-white/10 flex items-center gap-2"
             >
               {isSaving ? (
-                <>
-                  <svg className="animate-spin h-4 w-4 text-muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span>Saving...</span>
-                </>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                    <polyline points="7 3 7 8 15 8"></polyline>
-                  </svg>
-                  <span>Save</span>
-                </>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>
               )}
+              <span>Save</span>
             </button>
-            <button 
+
+            <button
               onClick={handlePublish}
-              className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors flex items-center gap-2"
               disabled={isPublishing}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-600/20 flex items-center gap-2 transition-all"
             >
               {isPublishing ? (
-                <>
-                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span>Publishing...</span>
-                </>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"></path>
-                    <line x1="16" y1="5" x2="22" y2="5"></line>
-                    <line x1="19" y1="2" x2="19" y2="8"></line>
-                    <circle cx="9" cy="9" r="2"></circle>
-                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                  </svg>
-                  <span>Publish</span>
-                </>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
               )}
+              <span>Publish</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* View selector */}
-      <div className="max-w-7xl mx-auto px-6 pt-4">
-        <div className="flex items-center justify-center gap-2 bg-background/50 px-3 py-1.5 rounded-lg border border-border inline-flex mx-auto">
-          <button 
-            onClick={() => {
-              setCurrentView("front");
-              setUnsavedChanges(true);
-            }}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 ${currentView === "front" ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
-          >
-            Front
-          </button>
-          <button 
-            onClick={() => {
-              setCurrentView("back");
-              setUnsavedChanges(true);
-            }}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 ${currentView === "back" ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
-          >
-            Back
-          </button>
-          <button 
-            onClick={() => {
-              setCurrentView("left");
-              setUnsavedChanges(true);
-            }}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 ${currentView === "left" ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
-          >
-            Left
-          </button>
-          <button 
-            onClick={() => {
-              setCurrentView("right");
-              setUnsavedChanges(true);
-            }}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 ${currentView === "right" ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
-          >
-            Right
-          </button>
-        </div>
+      {/* 3. Floating Sidebar (Left) */}
+      <div className="absolute top-24 left-6 bottom-8 w-80 glass-panel p-4 rounded-2xl z-40 flex flex-col animate-in-right">
+        <DesignSidebar
+          onAddElement={handleAddElement}
+          productType={productType}
+          setProductType={setProductType}
+          currentView={currentView}
+        />
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-1 h-[calc(100vh-220px)] overflow-hidden card-glass rounded-xl p-4 soft-shadow">
-            <DesignSidebar 
-              onAddElement={handleAddElement}
-              productType={productType}
-              currentView={currentView}
-            />
-          </div>
-          
-          {/* Canvas */}
-          <div className="lg:col-span-3">
-            <DesignCanvas 
-              productType={productType}
-              currentView={currentView}
-              selectedColor={selectedColor}
-              setSelectedColor={setSelectedColor}
-              designElements={designElements}
-              setDesignElements={setDesignElements}
-              setUnsavedChanges={setUnsavedChanges}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Tutorial overlay - shown to new users */}
+      {/* 4. Tutorial Overlay (Optional) */}
       {showTutorial && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center">
-          <div className="bg-background rounded-xl p-6 max-w-lg w-full">
-            <h3 className="text-xl font-bold mb-4">Welcome to the Design Studio!</h3>
-            <p className="text-muted mb-4">
-              Here's how to get started with your custom apparel design:
-            </p>
-            <ol className="space-y-3 mb-6">
-              <li className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">1</div>
-                <div>
-                  <strong>Choose your product</strong> - Select between T-shirts and hoodies
-                </div>
-              </li>
-              <li className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">2</div>
-                <div>
-                  <strong>Select a view</strong> - Design the front, back, or sides of your product
-                </div>
-              </li>
-              <li className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">3</div>
-                <div>
-                  <strong>Add elements</strong> - Drag images, text, or shapes onto your design
-                </div>
-              </li>
-              <li className="flex gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center shrink-0">4</div>
-                <div>
-                  <strong>Customize</strong> - Resize, rotate, and adjust your design elements
-                </div>
-              </li>
-            </ol>
-            <div className="flex justify-end">
-              <button 
-                onClick={() => setShowTutorial(false)}
-                className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors"
-              >
-                Got it!
-              </button>
-            </div>
+        <div className="absolute bottom-8 right-8 z-50 animate-in">
+          <div className="glass-panel p-4 rounded-xl max-w-xs relative">
+            <button
+              onClick={() => setShowTutorial(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-white"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+            <h4 className="font-semibold text-white mb-1">Quick Tips</h4>
+            <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
+              <li>Drag on the canvas to rotate view</li>
+              <li>Click "Paint Brush" to colorize parts</li>
+              <li>Drop images from sidebar to add logos</li>
+              <li>Use text tab to add custom typography</li>
+            </ul>
           </div>
         </div>
       )}
 
-      {/* Keyboard shortcuts helper */}
-      {showKeyboardShortcuts && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
-          <div className="bg-background rounded-xl p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Keyboard Shortcuts</h3>
-              <button 
-                onClick={() => setShowKeyboardShortcuts(false)}
-                className="text-muted hover:text-foreground"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Save</span>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">⌘</kbd>
-                  <span className="text-xs">+</span>
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">S</kbd>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Publish</span>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">⌘</kbd>
-                  <span className="text-xs">+</span>
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">P</kbd>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Undo</span>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">⌘</kbd>
-                  <span className="text-xs">+</span>
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">Z</kbd>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Redo</span>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">⌘</kbd>
-                  <span className="text-xs">+</span>
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">Shift</kbd>
-                  <span className="text-xs">+</span>
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">Z</kbd>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Delete Element</span>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">Delete</kbd>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Show Shortcuts</span>
-                <div className="flex items-center gap-1">
-                  <kbd className="px-2 py-1 bg-muted/20 rounded text-xs font-mono">?</kbd>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Keyboard shortcuts button */}
-      <div className="fixed bottom-4 right-4 z-40">
-        <button 
-          className="w-10 h-10 rounded-full bg-background border border-border flex items-center justify-center text-muted hover:text-foreground transition-colors shadow-lg"
-          onClick={() => setShowKeyboardShortcuts(true)}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect width="20" height="16" x="2" y="4" rx="2"></rect>
-            <path d="M6 8h.001"></path>
-            <path d="M10 8h.001"></path>
-            <path d="M14 8h.001"></path>
-            <path d="M18 8h.001"></path>
-            <path d="M8 12h.001"></path>
-            <path d="M12 12h.001"></path>
-            <path d="M16 12h.001"></path>
-            <path d="M7 16h10"></path>
-          </svg>
-        </button>
-      </div>
     </div>
   );
 }
-
-
-

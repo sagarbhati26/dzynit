@@ -2,7 +2,7 @@
 import * as THREE from "three";
 
 export function patchMaterialWithGradient(
-  material: THREE.MeshStandardMaterial,
+  material: THREE.Material,
   gradientTexture: THREE.Texture,
   strength = 1.0
 ) {
@@ -33,4 +33,5 @@ export function patchMaterialWithGradient(
   };
 
   material.needsUpdate = true;
+  (material as any).gradientPatched = true;
 }

@@ -10,24 +10,27 @@ const user = {
   username: "sagarbhati",
   bio: "Digital designer and t-shirt enthusiast. Creating unique apparel designs since 2020.",
   joinDate: "March 2023",
-  avatar: "/avatar-placeholder.png" // This would be replaced with an actual avatar image
+  avatar: "/avatar-placeholder.png",
+  followers: 675,
+  following: 445
 };
 
-// Mock data for drafts and published designs
+// Mock data for posts (designs) and drafts
+const posts = [
+  { id: 1, title: "Purple Tee", likes: 83, comments: 10, date: "Aug 4, 2025" },
+  { id: 2, title: "Sleeve Script", likes: 42, comments: 3, date: "Sep 12, 2025" },
+  { id: 3, title: "Minimal Logo", likes: 58, comments: 6, date: "Oct 7, 2025" },
+  { id: 4, title: "Gradient Waves", likes: 31, comments: 2, date: "Oct 20, 2025" }
+];
+
 const drafts = [
   { id: 1, title: "Summer Vibes", date: "2 days ago" },
   { id: 2, title: "Geometric Pattern", date: "1 week ago" },
   { id: 3, title: "Typography Experiment", date: "2 weeks ago" }
 ];
 
-const publishedDesigns = [
-  { id: 1, title: "Mountain Sunset", sales: 24, revenue: "$479.76", date: "Apr 12, 2023" },
-  { id: 2, title: "Abstract Waves", sales: 18, revenue: "$359.82", date: "May 3, 2023" },
-  { id: 3, title: "Minimalist Lines", sales: 31, revenue: "$619.69", date: "Jun 22, 2023" }
-];
-
 export default function ProfilePage() {
-  const [activeTab, setActiveTab] = useState("drafts");
+  const [activeTab, setActiveTab] = useState("posts");
   
   return (
     <div className="min-h-screen pt-24 pb-16">
@@ -65,27 +68,31 @@ export default function ProfilePage() {
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <div className="card-glass rounded-xl p-5 soft-shadow">
-            <div className="text-sm text-muted mb-1">Total Designs</div>
-            <div className="text-3xl font-bold">{drafts.length + publishedDesigns.length}</div>
+            <div className="text-sm text-muted mb-1">Posts</div>
+            <div className="text-3xl font-bold">{posts.length}</div>
           </div>
           <div className="card-glass rounded-xl p-5 soft-shadow">
-            <div className="text-sm text-muted mb-1">Total Sales(only for self view)</div>
-            <div className="text-3xl font-bold">{publishedDesigns.reduce((sum, design) => sum + design.sales, 0)}</div>
+            <div className="text-sm text-muted mb-1">Followers</div>
+            <div className="text-3xl font-bold">{user.followers}</div>
           </div>
           <div className="card-glass rounded-xl p-5 soft-shadow">
-            <div className="text-sm text-muted mb-1">followers*public</div>
-            <div className="text-3xl font-bold">{publishedDesigns.reduce((sum, design) => sum + design.sales, 0)}</div>
-          </div>
-          <div className="card-glass rounded-xl p-5 soft-shadow">
-            <div className="text-sm text-muted mb-1">Total Revenue</div>
-            <div className="text-3xl font-bold text-primary">
-              ${publishedDesigns.reduce((sum, design) => sum + parseFloat(design.revenue.substring(1)), 0).toFixed(2)}
-            </div>
+            <div className="text-sm text-muted mb-1">Following</div>
+            <div className="text-3xl font-bold">{user.following}</div>
           </div>
         </div>
         
         {/* Tabs */}
         <div className="flex border-b border-border mb-6">
+          <button
+            onClick={() => setActiveTab("posts")}
+            className={`py-3 px-5 text-sm font-medium transition-colors ${
+              activeTab === "posts" 
+                ? "text-primary border-b-2 border-primary" 
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            Posts
+          </button>
           <button
             onClick={() => setActiveTab("drafts")}
             className={`py-3 px-5 text-sm font-medium transition-colors ${
@@ -95,16 +102,6 @@ export default function ProfilePage() {
             }`}
           >
             Drafts
-          </button>
-          <button
-            onClick={() => setActiveTab("published")}
-            className={`py-3 px-5 text-sm font-medium transition-colors ${
-              activeTab === "published" 
-                ? "text-primary border-b-2 border-primary" 
-                : "text-muted hover:text-foreground"
-            }`}
-          >
-            Published Designs
           </button>
           <button
             onClick={() => setActiveTab("settings")}
@@ -119,6 +116,40 @@ export default function ProfilePage() {
         </div>
         
         {/* Tab Content */}
+        {activeTab === "posts" && (
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Posts</h2>
+            {posts.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                {posts.map((post) => (
+                  <div key={post.id} className="relative group aspect-square rounded-lg overflow-hidden border border-border">
+                    <div className="w-full h-full bg-linear-to-br from-primary/30 to-accent/30" />
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 flex items-center justify-center gap-6">
+                      <div className="flex items-center gap-2 text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 21C12 21 4 13.5 4 8.5C4 6.5 5.5 5 7.5 5C9 5 10 6 12 8C14 6 15 5 16.5 5C18.5 5 20 6.5 20 8.5C20 13.5 12 21 12 21Z"/></svg>
+                        <span className="text-sm">{post.likes}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span className="text-sm">{post.comments}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="text-muted mb-3">No posts yet</div>
+                <Link href="/dzyn">
+                  <button className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors">
+                    Create a Design
+                  </button>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
+        
         {activeTab === "drafts" && (
           <div>
             <div className="flex justify-between items-center mb-4">
@@ -148,69 +179,6 @@ export default function ProfilePage() {
                 <Link href="/dzyn">
                   <button className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors">
                     Create Your First Design
-                  </button>
-                </Link>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {activeTab === "published" && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Published Designs</h2>
-            
-            {publishedDesigns.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium">Design</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium">Date</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium">Sales</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium">Revenue</th>
-                      <th className="text-right py-3 px-4 text-sm font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {publishedDesigns.map((design) => (
-                      <tr key={design.id} className="border-b border-border hover:bg-background/50 transition-colors">
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded bg-primary/10"></div>
-                            <span className="font-medium">{design.title}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-sm text-muted">{design.date}</td>
-                        <td className="py-4 px-4 text-sm">{design.sales}</td>
-                        <td className="py-4 px-4 text-sm font-medium text-primary">{design.revenue}</td>
-                        <td className="py-4 px-4 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button className="p-1.5 rounded-md hover:bg-background transition-colors text-muted hover:text-foreground">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                              </svg>
-                            </button>
-                            <button className="p-1.5 rounded-md hover:bg-background transition-colors text-muted hover:text-foreground">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 11v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8"></path>
-                                <path d="M8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"></path>
-                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path>
-                              </svg>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="text-muted mb-3">You haven't published any designs yet</div>
-                <Link href="/dzyn">
-                  <button className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark transition-colors">
-                    Create and Publish a Design
                   </button>
                 </Link>
               </div>

@@ -2,18 +2,18 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Environment, Decal, Text } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import ProductModel from "./Product model/GradientProductModel";
 import {
   applyGradientToMeshes,
   paintBrush,
-  exportTexturePNG,
   getPainter,
 } from "./GradientPoints/GradientOverlay";
 import type { ControlPoint as BaseControlPoint } from "./GradientPoints/GradientTexture";
 import GradientPoint3D from "./GradientPoints/GradientPoint3D";
+import { Slider } from "./ui/Slider";
 
 interface DesignElement {
   id: string;
@@ -21,14 +21,24 @@ interface DesignElement {
   content: string;
   x?: number;
   y?: number;
-  width?: number;
+  width?: number; // fontSize for text
   height?: number;
   rotation?: number;
   view?: string;
   color?: string;
+  fontFamily?: string;
+  fontWeight?: string;
+  align?: CanvasTextAlign;
   url?: string;
   dropCanvasWidth?: number;
   dropCanvasHeight?: number;
+  strokeColor?: string;
+  strokeWidth?: number;
+  shadowColor?: string;
+  shadowBlur?: number;
+  position?: [number, number, number];
+  rotationVector?: [number, number, number];
+  scaleVector?: [number, number, number];
 }
 
 interface DesignCanvasProps {
@@ -39,7 +49,7 @@ interface DesignCanvasProps {
   selectedColor?: string;
   setSelectedColor?: (color: string) => void;
   designElements?: DesignElement[];
-  setDesignElements?: (elements: DesignElement[]) => void;
+  setDesignElements?: React.Dispatch<React.SetStateAction<DesignElement[]>>;
   setUnsavedChanges?: (value: boolean) => void;
 }
 
@@ -48,13 +58,11 @@ type ControlPoint = BaseControlPoint & { worldPos: THREE.Vector3 };
 export default function DesignCanvas({
   productType = "tshirt",
   currentView = "front",
-  setProductType = () => {},
-  setCurrentView = () => {},
   selectedColor = "black",
-  setSelectedColor = () => {},
+  setSelectedColor = () => { },
   designElements = [],
-  setDesignElements = () => {},
-  setUnsavedChanges = () => {},
+  setDesignElements = () => { },
+  setUnsavedChanges = () => { },
 }: DesignCanvasProps) {
   const [zoom, setZoom] = useState(100);
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -71,6 +79,7 @@ export default function DesignCanvas({
   const [brushColor, setBrushColor] = useState("#ff5722");
   const [brushRadius, setBrushRadius] = useState(0.06);
   const [brushHardness, setBrushHardness] = useState(0.6);
+  const [showDebugGrid, setShowDebugGrid] = useState(false);
 
   // selected index
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
@@ -80,58 +89,65 @@ export default function DesignCanvas({
   const draggingIndexRef = useRef<number | null>(null);
   const draggingTextIndexRef = useRef<number | null>(null);
   const isPaintingRef = useRef(false);
-  const onModelReady = (meshes: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[]) => {
-    modelMeshesRef.current = meshes;
-    if (controlPoints.length > 0) {
-      applyGradientToMeshes(modelMeshesRef.current, controlPoints, 0.9);
-      const p = getPainter();
-      designElements
-        .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
-        .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
-    }
-  };
-  useEffect(() => {
+
+  const updateTexture = () => {
     if (!modelMeshesRef.current || modelMeshesRef.current.length === 0) return;
     applyGradientToMeshes(
       modelMeshesRef.current,
       controlPoints.map((p) => ({ uv: p.uv, color: p.color, radius: p.radius })),
       0.9
     );
-    const p = getPainter();
-    designElements
-      .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
-      .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
-  }, [controlPoints, designElements]);
+    if (showDebugGrid) {
+      const p = getPainter();
+      p.drawDebugGrid();
+    }
+  };
 
-  useEffect(() => {
+  const updateModelColor = () => {
     if (!modelMeshesRef.current || modelMeshesRef.current.length === 0) return;
     const col = new THREE.Color(selectedColor);
     modelMeshesRef.current.forEach(({ mesh }) => {
-      if (Array.isArray(mesh.material)) {
-        (mesh.material as any[]).forEach((m: any) => {
-          if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
-            m.color.copy(col);
-            m.needsUpdate = true;
-          }
-        });
-      } else {
-        const m: any = mesh.material;
+      const applyToMaterial = (m: any) => {
         if (m.isMeshStandardMaterial || m.isMeshPhysicalMaterial) {
           m.color.copy(col);
+          m.transparent = false;
+          m.depthWrite = true;
           m.needsUpdate = true;
         }
+      };
+
+      if (Array.isArray(mesh.material)) {
+        (mesh.material as any[]).forEach(applyToMaterial);
+      } else {
+        applyToMaterial(mesh.material);
       }
     });
-    applyGradientToMeshes(
-      modelMeshesRef.current,
-      controlPoints.map((p) => ({ uv: p.uv, color: p.color, radius: p.radius })),
-      0.9
-    );
-    const p = getPainter();
-    designElements
-      .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
-      .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
+  };
+
+  useEffect(() => {
+    updateModelColor();
+    updateTexture();
   }, [selectedColor, designElements]);
+
+  useEffect(() => {
+    const controls = model3DRef.current as any;
+    if (!controls) return;
+    const polar = Math.PI / 2.5;
+    const azMap: Record<string, number> = { front: 0, back: Math.PI, left: Math.PI / 2, right: -Math.PI / 2 };
+    const az = azMap[currentView] ?? 0;
+    if (typeof controls.rotateTo === "function") {
+      controls.rotateTo(az, polar, true);
+    }
+  }, [currentView]);
+
+  const onModelReady = (meshes: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[]) => {
+    modelMeshesRef.current = meshes;
+    updateModelColor();
+    // Initial draw
+    if (controlPoints.length > 0 || designElements.some(e => e.type === "text")) {
+      updateTexture();
+    }
+  };
 
   const addPointFromIntersection = (inter: any) => {
     if (!inter || !inter.uv) return;
@@ -148,57 +164,65 @@ export default function DesignCanvas({
   };
 
   const handlePointerDown = (e: any) => {
-    console.log("PointerDown event:", e);
-console.log("Intersections:", e.intersections);
     if (!e.intersections || e.intersections.length === 0) return;
     const inter = e.intersections[0];
 
-    // If pointer hits a handle (mesh.userData.isHandle), don't add a new point here
-    if (inter.object?.userData?.isHandle) {
-      // Let the handle's onPointerDown manage starting drag
-      return;
-    }
+    if (inter.object?.userData?.isHandle) return;
 
     if (toolMode === "point") {
       addPointFromIntersection(inter);
     } else if (toolMode === "text") {
       if (!inter.uv) return;
-      let idx = selectedTextIndex;
-      if (idx === null) {
-        const lastTextIndex = [...designElements].map((e, i) => ({ e, i })).filter((x) => x.e.type === "text").map((x) => x.i).pop();
-        if (lastTextIndex === undefined) return;
-        idx = lastTextIndex;
-        setSelectedTextIndex(idx);
+      const pos: [number, number, number] = inter.point ? [inter.point.x, inter.point.y, inter.point.z] : [0, 0, 0.2];
+
+      // Calculate rotation from normal to keep decal on surface
+      let rotation: [number, number, number] = [0, 0, 0];
+      if (inter.face && inter.face.normal) {
+        const normal = inter.face.normal.clone();
+        // The decal needs to look at the normal
+        const helper = new THREE.Object3D();
+        helper.position.copy(inter.point);
+        helper.lookAt(inter.point.clone().add(normal));
+        rotation = [helper.rotation.x, helper.rotation.y, helper.rotation.z];
       }
-      setDesignElements((prev) => prev.map((e, i) => (i === (idx as number) ? { ...e, x: inter.uv.x, y: inter.uv.y, rotation: e.rotation || 0 } : e)) as any);
-      draggingTextIndexRef.current = idx as number;
-      const p = getPainter();
-      designElements
-        .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
-        .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
+
+      if (selectedTextIndex !== null && designElements[selectedTextIndex]?.type === 'text') {
+        // Move existing
+        setDesignElements(designElements.map((el, i) => (i === selectedTextIndex ? { ...el, position: pos, rotationVector: rotation } : el)));
+        draggingTextIndexRef.current = selectedTextIndex;
+      } else {
+        // Create New Text
+        const newIdx = designElements.length;
+        setDesignElements([...designElements, {
+          id: Math.random().toString(36).slice(2),
+          type: "text",
+          content: "New Text",
+          position: pos,
+          rotationVector: rotation,
+          rotation: 0,
+          width: 32,
+          color: "#ffffff",
+          strokeColor: "transparent",
+          strokeWidth: 0,
+          view: currentView
+        }]);
+        setSelectedTextIndex(newIdx);
+        draggingTextIndexRef.current = newIdx;
+      }
     } else {
       isPaintingRef.current = true;
       if (inter.uv) {
         paintBrush(inter.uv.x, inter.uv.y, brushColor, brushRadius, brushHardness);
-        if (modelMeshesRef.current.length) {
-          applyGradientToMeshes(modelMeshesRef.current, controlPoints.map((p) => ({ uv: p.uv, color: p.color, radius: p.radius })), 0.9);
-          const p = getPainter();
-          designElements
-            .filter((e) => e.type === "text" && e.x !== undefined && e.y !== undefined)
-            .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
-        }
+        updateTexture();
       }
     }
   };
 
   const handlePointerMove = (e: any) => {
-    // If a handle is being dragged, update its position using the first intersection that is not a handle
     const draggingIndex = draggingIndexRef.current;
     if (draggingIndex !== null) {
-      // find first intersection with uv that is NOT a handle
       const targetInter = (e.intersections || []).find((it: any) => !it.object?.userData?.isHandle && it.uv);
       if (!targetInter) return;
-
       const { point, uv } = targetInter;
       setControlPoints((prev) =>
         prev.map((p, idx) => (idx === draggingIndex ? { ...p, worldPos: point.clone(), uv: { x: uv.x, y: uv.y } } : p))
@@ -208,14 +232,10 @@ console.log("Intersections:", e.intersections);
 
     const draggingText = draggingTextIndexRef.current;
     if (draggingText !== null) {
-      const targetInter = (e.intersections || []).find((it: any) => !it.object?.userData?.isHandle && it.uv);
+      const targetInter = (e.intersections || []).find((it: any) => !it.object?.userData?.isHandle && it.object?.type === "Mesh");
       if (!targetInter) return;
-      const { uv } = targetInter;
-      setDesignElements((prev) => prev.map((el, i) => (i === draggingText ? { ...el, x: uv.x, y: uv.y } : el)) as any);
-      const p = getPainter();
-      designElements
-        .filter((de) => de.type === "text" && de.x !== undefined && de.y !== undefined)
-        .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
+      const { point } = targetInter;
+      setDesignElements(designElements.map((el, i) => (i === draggingText ? { ...el, position: [point.x, point.y, point.z] } : el)));
       return;
     }
 
@@ -223,13 +243,7 @@ console.log("Intersections:", e.intersections);
     const inter = (e.intersections || [])[0];
     if (!inter || !inter.uv) return;
     paintBrush(inter.uv.x, inter.uv.y, brushColor, brushRadius, brushHardness);
-    if (modelMeshesRef.current.length) {
-      applyGradientToMeshes(modelMeshesRef.current, controlPoints.map((p) => ({ uv: p.uv, color: p.color, radius: p.radius })), 0.9);
-      const p = getPainter();
-      designElements
-        .filter((de) => de.type === "text" && de.x !== undefined && de.y !== undefined)
-        .forEach((t) => p.drawText(t.x as number, t.y as number, t.content, (t.width as number) || 64, t.color || "#000", (t.rotation as number) || 0));
-    }
+    updateTexture();
   };
 
   const handlePointerUp = (e: any) => {
@@ -237,42 +251,37 @@ console.log("Intersections:", e.intersections);
     draggingIndexRef.current = null;
     draggingTextIndexRef.current = null;
   };
+
   const startHandleDrag = (index: number, e: any) => {
     e.stopPropagation();
     draggingIndexRef.current = index;
-    // also mark selected
     setSelectedPointIndex(index);
   };
-  const exportUVTexture = () => {
-    const url = exportTexturePNG();
-    if (!url) return;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "uv-gradient.png";
-    a.click();
-  };
-  const render3DProductShape = () => {
-    return (
-      <div className="w-full h-full" style={{ backgroundColor: "#2b2b2b" }}>
+
+  return (
+    <div className="relative w-full h-full bg-gradient-to-br from-gray-900 to-black overflow-hidden rounded-2xl shadow-2xl border border-white/5">
+
+      {/* 3D Canvas */}
+      <div className="absolute inset-0 cursor-crosshair">
         <Canvas
-          camera={{ fov: 50 }}
+          camera={{ fov: 45, position: [0, 0, 15] }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          gl={{ preserveDrawingBuffer: true, antialias: true }}
+          dpr={[1, 2]}
         >
           <ambientLight intensity={0.7} />
-          <directionalLight position={[10, 10, 5]} intensity={1} />
-          <pointLight position={[-10, -10, -10]} intensity={0.5} />
+          <hemisphereLight args={[0xffffff, 0x000000, 0.8]} />
+          <spotLight position={[5, 10, 5]} angle={0.5} penumbra={1} intensity={1} castShadow />
+          <Environment preset="city" />
 
           <React.Suspense fallback={null}>
             <ProductModel productType={productType} scale={1} onModelReady={onModelReady} />
           </React.Suspense>
 
-          {/* Render 3D gradient handles (spheres) */}
-          {controlPoints.map((p, i) => {
-            // if worldPos isn't available (shouldn't happen), skip rendering that handle
-            if (!p.worldPos) return null;
-            return (
+          {controlPoints.map((p, i) => (
+            p.worldPos && (
               <GradientPoint3D
                 key={i}
                 index={i}
@@ -282,215 +291,205 @@ console.log("Intersections:", e.intersections);
                 selected={selectedPointIndex === i}
                 onPointerDown={startHandleDrag}
               />
-            );
-          })}
+            )
+          ))}
 
-          <OrbitControls ref={model3DRef} enablePan={false} makeDefault/>
+          <React.Suspense fallback={null}>
+            {designElements
+              .filter(e => e.type === "text")
+              .map((el, i) => {
+                // Find the primary mesh (usually the body) by surface area or name, fallback to first
+                // Simply picking the first mesh is risky if it's a button or zipper.
+                // We'll pick the mesh with the largest geometry bounding sphere for now as a heuristic.
+                const targetMesh = modelMeshesRef.current.reduce((max, curr) => {
+                  if (!max) return curr;
+                  if (!curr.mesh.geometry.boundingSphere) curr.mesh.geometry.computeBoundingSphere();
+                  if (!max.mesh.geometry.boundingSphere) max.mesh.geometry.computeBoundingSphere();
+                  return (curr.mesh.geometry.boundingSphere?.radius || 0) > (max.mesh.geometry.boundingSphere?.radius || 0) ? curr : max;
+                }, modelMeshesRef.current[0])?.mesh;
+
+                // Ensure we have a valid mesh
+                if (!targetMesh || !targetMesh.geometry) return null;
+
+                const pos = el.position ? new THREE.Vector3(...el.position) : new THREE.Vector3(0, 0, 0.6);
+                const rot = el.rotationVector ? el.rotationVector : [0, 0, 0];
+
+                return (
+                  <Decal
+                    key={el.id}
+                    position={pos}
+                    rotation={rot as any}
+                    scale={[0.4, 0.4, 0.4]}
+                    mesh={{ current: targetMesh } as any}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setSelectedTextIndex(i);
+                      draggingTextIndexRef.current = i;
+                    }}
+                  >
+                    <Text
+                      fontSize={el.width ? el.width / 500 : 0.1}
+                      color={el.color}
+                      anchorX="center"
+                      anchorY="middle"
+                      outlineWidth={(el.strokeWidth || 0) * 0.002}
+                      outlineColor={el.strokeColor || "transparent"}
+                      rotation={[0, 0, (el.rotation || 0) * Math.PI / 180]}
+                    >
+                      {el.content}
+                    </Text>
+                  </Decal>
+                );
+              })
+            }
+          </React.Suspense>
+          <OrbitControls ref={model3DRef} enablePan={true} makeDefault minDistance={0.5} maxDistance={50} />
         </Canvas>
       </div>
-    );
-  };
 
+      {/* Floating Controls Overlay - Bottom Center */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 glass-panel rounded-full px-6 py-3 flex gap-4 items-center animate-in" style={{ animationDelay: '0.1s' }}>
 
-  return (
-    <div className="flex flex-row h-full">
-      {/* LEFT: 3D */}
-      <div className="flex-1 relative overflow-hidden border rounded-lg bg-gray-50">
-        <div
-          ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-          onDragOver={(e) => e.preventDefault()}
-        >
-          {render3DProductShape()}
+        {/* Garment Color */}
+        <div className="flex items-center gap-2" title="Garment Color">
+          <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-8 h-8 rounded-full cursor-pointer ring-2 ring-white/20 bg-transparent p-0 border-0" title="Garment Color" />
         </div>
+        <div className="w-px h-6 bg-white/10 mx-2"></div>
 
-        {/* <div className="absolute bottom-2 left-2 flex items-center space-x-2 bg-white/80 p-2 rounded">
-          <span className="text-sm text-gray-500">Zoom:</span>
-          <input
-            type="range"
-            min="50"
-            max="200"
-            value={zoom}
-            onChange={(e) => setZoom(Number(e.target.value))}
-            className="w-24"
-          />
+        <button
+          onClick={() => setToolMode("point")}
+          className={`p-2.5 rounded-full transition-all duration-300 ${toolMode === 'point' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/40 scale-110' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+          title="Add Gradient Point"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /></svg>
+        </button>
+        <button
+          onClick={() => setToolMode("text")}
+          className={`p-2.5 rounded-full transition-all duration-300 ${toolMode === 'text' ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/40 scale-110' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+          title="Add Text"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 6.1H3" /><path d="M21 12.1H3" /><path d="M15.1 18H3" /></svg>
+        </button>
+        <button
+          onClick={() => setToolMode("brush")}
+          className={`p-2.5 rounded-full transition-all duration-300 ${toolMode === 'brush' ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/40 scale-110' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+          title="Paint Brush"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2.12 2.12 0 1 0-3-3Z" /><path d="M9 8c-2 3-4 3.5-7 4l8 10c2-1 6-5 6-7" /><path d="M14.5 17.5 4.5 15" /></svg>
+        </button>
+        <div className="w-px h-6 bg-white/10 mx-2"></div>
+        {/* <div className="flex items-center gap-3">
+          <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} className="w-8 h-8 rounded-full cursor-pointer ring-2 ring-white/20" title="Brush Color" />
+          <div className="flex flex-col w-24">
+            <Slider value={brushRadius} min={0.01} max={0.2} step={0.01} onChange={(e) => setBrushRadius(Number(e.target.value))} />
+          </div>
         </div> */}
       </div>
-      <div className="w-80 p-4  border-l overflow-auto">
-        <h2 className="text-lg font-semibold mb-3">Design Tools</h2>
 
-        <div className="flex gap-2 mb-3">
-          <button
-            onClick={() => setToolMode("point")}
-            className={`px-3 py-1 rounded ${toolMode === "point" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
-          >
-            Point
-          </button>
-          <button
-            onClick={() => setToolMode("brush")}
-            className={`px-3 py-1 rounded ${toolMode === "brush" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
-          >
-            Brush
-          </button>
-          <button
-            onClick={() => setToolMode("text")}
-            className={`px-3 py-1 rounded ${toolMode === "text" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
-          >
-            Text
-          </button>
-          <button onClick={exportUVTexture} className="px-3 py-1 rounded bg-gray-100">Export UV</button>
-        </div>
+      {/* Floating Context Panel - Right Side */}
+      {selectedPointIndex !== null && controlPoints[selectedPointIndex] && (
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 glass-panel p-5 rounded-2xl w-64 animate-in space-y-4">
+          <div className="flex justify-between items-center border-b border-white/10 pb-2">
+            <h3 className="font-semibold text-white">Point Settings</h3>
+            <button onClick={() => setSelectedPointIndex(null)} className="text-gray-500 hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
 
-        <div className="mb-3">
-          <label className="block text-sm">Brush Color</label>
-          <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} />
-        </div>
-
-        <div className="mb-3">
-          <label className="block text-sm">Brush Radius: {(brushRadius * 100).toFixed(0)}%</label>
-          <input
-            type="range"
-            min="0.01"
-            max="0.6"
-            step="0.01"
-            value={brushRadius}
-            onChange={(e) => setBrushRadius(Number(e.target.value))}
-          />
-        </div>
-
-        <div className="mb-3">
-          <label className="block text-sm">Hardness: {brushHardness}</label>
-          <input
-            type="range"
-            min="0.1"
-            max="1.0"
-            step="0.05"
-            value={brushHardness}
-            onChange={(e) => setBrushHardness(Number(e.target.value))}
-          />
-        </div>
-
-        <div className="mb-3">
-          <label className="block text-sm">Garment Color</label>
-          <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} />
-        </div>
-
-        <hr className="my-3" />
-
-        <h3 className="font-semibold">Points ({controlPoints.length})</h3>
-        <div className="space-y-2 mt-2">
-          {controlPoints.map((p, i) => (
-            <div
-              key={i}
-              className={`p-2 rounded border ${selectedPointIndex === i ? "border-blue-500" : "border-gray-200"}`}
-              onClick={() => setSelectedPointIndex(i)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div style={{ width: 18, height: 18, background: p.color, borderRadius: 4, border: "1px solid #ddd" }} />
-                  <div className="text-sm">Point #{i + 1}</div>
-                </div>
-                <div className="text-xs text-gray-500">{Math.round(p.radius * 100)}%</div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-gray-400 mb-2 block">Color</label>
+              <div className="flex gap-2">
+                <input type="color" className="w-full h-10 rounded-lg cursor-pointer" value={controlPoints[selectedPointIndex].color} onChange={(e) => {
+                  const val = e.target.value;
+                  setControlPoints(prev => prev.map((p, i) => i === selectedPointIndex ? { ...p, color: val, worldPos: p.worldPos.clone() } : p));
+                }} />
               </div>
-
-              {selectedPointIndex === i && (
-                <div className="mt-2 space-y-2">
-                  <div>
-                    <label className="text-sm">Color</label>
-                    <input
-                      type="color"
-                      value={p.color}
-                      onChange={(e) =>
-                        setControlPoints((prev) => {
-                          const next = prev.map((x, idx) =>
-                            idx === i
-                              ? { ...x, color: e.target.value, worldPos: x.worldPos.clone() }
-                              : x
-                          );
-
-                          setTimeout(() => {
-                            if (modelMeshesRef.current.length) {
-                              applyGradientToMeshes(
-                                modelMeshesRef.current,
-                                next.map((p) => ({
-                                  uv: p.uv,
-                                  color: p.color,
-                                  radius: p.radius,
-                                })),
-                                0.9
-                              );
-                            }
-                          }, 0);
-
-                          return next;
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm">Radius</label>
-                    <input
-                      type="range"
-                      min="0.01"
-                      max="0.6"
-                      step="0.01"
-                      value={p.radius}
-                      onChange={(e) =>
-                        setControlPoints((prev) => {
-                          const next = prev.map((x, idx) =>
-                            idx === i
-                              ? { ...x, radius: Number(e.target.value), worldPos: x.worldPos.clone() }
-                              : x
-                          );
-
-                          setTimeout(() => {
-                            if (modelMeshesRef.current.length) {
-                              applyGradientToMeshes(
-                                modelMeshesRef.current,
-                                next.map((p) => ({
-                                  uv: p.uv,
-                                  color: p.color,
-                                  radius: p.radius,
-                                })),
-                                0.9
-                              );
-                            }
-                          }, 0);
-
-                          return next;
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex gap-2 mt-2">
-                    <button
-                      className="px-2 py-1 bg-red-500 text-white rounded"
-                      onClick={() => {
-                        setControlPoints((prev) => prev.filter((_, idx) => idx !== i));
-                        setSelectedPointIndex(null);
-                      }}
-                    >
-                      Delete
-                    </button>
-                    <button
-                      className="px-2 py-1 bg-gray-100 rounded"
-                      onClick={() => {
-                        const cp = controlPoints[i];
-                        setControlPoints((prev) => [...prev, { uv: { ...cp.uv }, color: cp.color, radius: cp.radius, worldPos: cp.worldPos.clone() }]);
-                      }}
-                    >
-                      Duplicate
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
-          ))}
+            <div>
+              <Slider label="Radius" value={controlPoints[selectedPointIndex].radius} min={0.01} max={0.5} step={0.01} onChange={(e) => {
+                const val = Number(e.target.value);
+                setControlPoints(prev => prev.map((p, i) => i === selectedPointIndex ? { ...p, radius: val, worldPos: p.worldPos.clone() } : p));
+              }} />
+            </div>
+            <button
+              onClick={() => {
+                setControlPoints(prev => prev.filter((_, i) => i !== selectedPointIndex));
+                setSelectedPointIndex(null);
+              }}
+              className="w-full py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors text-sm font-medium border border-red-500/20"
+            >
+              Delete Point
+            </button>
+          </div>
         </div>
+      )}
+
+      {selectedTextIndex !== null && designElements[selectedTextIndex] && (
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 glass-panel p-5 rounded-2xl w-64 animate-in space-y-4">
+          <div className="flex justify-between items-center border-b border-white/10 pb-2">
+            <h3 className="font-semibold text-white">Text Settings</h3>
+            <button onClick={() => setSelectedTextIndex(null)} className="text-gray-500 hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <textarea
+                value={designElements[selectedTextIndex].content}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDesignElements((prev: DesignElement[]) => prev.map((el, i) => i === selectedTextIndex ? { ...el, content: val } : el));
+                }}
+                className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-sm text-white focus:outline-none focus:border-violet-500 min-h-[60px]"
+              />
+            </div>
+            <div>
+              <Slider label="Size" value={designElements[selectedTextIndex].width || 64} min={12} max={300} onChange={(e) => {
+                const val = Number(e.target.value);
+                setDesignElements((prev: DesignElement[]) => prev.map((el, i) => i === selectedTextIndex ? { ...el, width: val } : el));
+              }} />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-gray-400 mb-1 block">Color</label>
+                <input type="color" className="w-full h-8 rounded cursor-pointer" value={designElements[selectedTextIndex].color} onChange={(e) => {
+                  const val = e.target.value;
+                  setDesignElements((prev: DesignElement[]) => prev.map((el, i) => i === selectedTextIndex ? { ...el, color: val } : el));
+                }} />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-gray-400 mb-1 block">Rotation</label>
+                <input type="number" className="w-full h-8 bg-white/5 border border-white/10 rounded px-2 text-xs" value={designElements[selectedTextIndex].rotation || 0} onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setDesignElements((prev: DesignElement[]) => prev.map((el, i) => i === selectedTextIndex ? { ...el, rotation: val } : el));
+                }} />
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setDesignElements((prev: DesignElement[]) => prev.filter((_, i) => i !== selectedTextIndex));
+                setSelectedTextIndex(null);
+              }}
+              className="w-full py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors text-sm font-medium border border-red-500/20"
+            >
+              Delete Text
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Controls - Top Right */}
+      <div className="absolute top-4 right-4 flex gap-2">
+        <button onClick={() => setShowDebugGrid(!showDebugGrid)} className={`glass-button p-2 rounded-lg text-xs font-medium ${showDebugGrid ? 'text-yellow-400 border-yellow-400/30' : 'text-gray-400'}`}>
+          Debug Grid
+        </button>
       </div>
+
     </div>
   );
 }
+
 
