@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Environment, Decal, Text } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
@@ -90,7 +90,7 @@ export default function DesignCanvas({
   const draggingTextIndexRef = useRef<number | null>(null);
   const isPaintingRef = useRef(false);
 
-  const updateTexture = () => {
+  const updateTexture = useCallback(() => {
     if (!modelMeshesRef.current || modelMeshesRef.current.length === 0) return;
     applyGradientToMeshes(
       modelMeshesRef.current,
@@ -98,12 +98,13 @@ export default function DesignCanvas({
       0.9
     );
     if (showDebugGrid) {
-      const p = getPainter();
-      p.drawDebugGrid();
+      const getP = getPainter;
+      const p = getP();
+      if (p) p.drawDebugGrid();
     }
-  };
+  }, [controlPoints, showDebugGrid]);
 
-  const updateModelColor = () => {
+  const updateModelColor = useCallback(() => {
     if (!modelMeshesRef.current || modelMeshesRef.current.length === 0) return;
     const col = new THREE.Color(selectedColor);
     modelMeshesRef.current.forEach(({ mesh }) => {
@@ -122,12 +123,12 @@ export default function DesignCanvas({
         applyToMaterial(mesh.material);
       }
     });
-  };
+  }, [selectedColor]);
 
   useEffect(() => {
     updateModelColor();
     updateTexture();
-  }, [selectedColor, designElements]);
+  }, [updateModelColor, updateTexture]);
 
   useEffect(() => {
     const controls = model3DRef.current as any;
@@ -140,14 +141,14 @@ export default function DesignCanvas({
     }
   }, [currentView]);
 
-  const onModelReady = (meshes: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[]) => {
+  const onModelReady = useCallback((meshes: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[]) => {
     modelMeshesRef.current = meshes;
     updateModelColor();
     // Initial draw
     if (controlPoints.length > 0 || designElements.some(e => e.type === "text")) {
       updateTexture();
     }
-  };
+  }, [controlPoints.length, designElements, updateModelColor, updateTexture]);
 
   const addPointFromIntersection = (inter: any) => {
     if (!inter || !inter.uv) return;
@@ -173,22 +174,33 @@ export default function DesignCanvas({
       addPointFromIntersection(inter);
     } else if (toolMode === "text") {
       if (!inter.uv) return;
-      const pos: [number, number, number] = inter.point ? [inter.point.x, inter.point.y, inter.point.z] : [0, 0, 0.2];
 
       // Calculate rotation from normal to keep decal on surface
       let rotation: [number, number, number] = [0, 0, 0];
+      let position: [number, number, number] = [0, 0, 0];
+
       if (inter.face && inter.face.normal) {
+        // Transform normal to world space
         const normal = inter.face.normal.clone();
+        normal.transformDirection(inter.object.matrixWorld).normalize();
+
+        // Offset slightly outwards to avoid Z-fighting
+        const pos = inter.point.clone().add(normal.clone().multiplyScalar(0.05));
+        position = [pos.x, pos.y, pos.z];
+
         // The decal needs to look at the normal
         const helper = new THREE.Object3D();
-        helper.position.copy(inter.point);
-        helper.lookAt(inter.point.clone().add(normal));
+        helper.position.copy(pos);
+        helper.lookAt(pos.clone().add(normal));
         rotation = [helper.rotation.x, helper.rotation.y, helper.rotation.z];
+      } else {
+        const pos = inter.point ? [inter.point.x, inter.point.y, inter.point.z] : [0, 0, 0.2];
+        position = [pos[0], pos[1], pos[2]];
       }
 
       if (selectedTextIndex !== null && designElements[selectedTextIndex]?.type === 'text') {
         // Move existing
-        setDesignElements(designElements.map((el, i) => (i === selectedTextIndex ? { ...el, position: pos, rotationVector: rotation } : el)));
+        setDesignElements(designElements.map((el, i) => (i === selectedTextIndex ? { ...el, position: position, rotationVector: rotation } : el)));
         draggingTextIndexRef.current = selectedTextIndex;
       } else {
         // Create New Text
@@ -197,7 +209,7 @@ export default function DesignCanvas({
           id: Math.random().toString(36).slice(2),
           type: "text",
           content: "New Text",
-          position: pos,
+          position: position,
           rotationVector: rotation,
           rotation: 0,
           width: 32,

@@ -16,6 +16,7 @@ export function applyGradientToMeshes(
   strength = 0.9
 ) {
   const p = getPainter();
+  if (!p) return;
 
   // Clear and apply control points
   p.clear();
