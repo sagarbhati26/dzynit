@@ -13,7 +13,8 @@ export function getPainter(size = 2048) {
 export function applyGradientToMeshes(
   meshes: { mesh: THREE.Mesh; material: THREE.Material | THREE.Material[] }[],
   controlPoints: any[],
-  strength = 0.9
+  strength = 0.9,
+  designElements: any[] = [] // Using any[] to match DesignElement structure later
 ) {
   const p = getPainter();
   if (!p) return;
@@ -22,6 +23,27 @@ export function applyGradientToMeshes(
   p.clear();
   controlPoints.forEach((pt) => {
     p.paintSpot(pt.uv.x, pt.uv.y, pt.color, pt.radius, 0.6);
+  });
+
+  // Paint Design Elements (Text)
+  designElements.forEach((el) => {
+    if (el.type === "text" && el.uv) {
+      p.drawText(
+        el.uv.x,
+        el.uv.y,
+        el.content,
+        el.width ? el.width : 64,
+        el.color,
+        el.fontWeight,
+        el.rotation,
+        el.align,
+        el.fontFamily,
+        el.strokeColor,
+        el.strokeWidth,
+        el.shadowColor,
+        el.shadowBlur
+      );
+    }
   });
 
   const tex = p.getTexture();

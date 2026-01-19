@@ -19,20 +19,19 @@ export default function DesignStudioPage() {
 
   // Communication between sidebar and canvas
   const handleAddElement = (element: any) => {
-    // If text, add to designElements
-    if (element.type === 'text') {
-      const newEl = {
-        ...element,
-        id: Math.random().toString(36).substr(2, 9),
-        x: 0.5,
-        y: 0.5,
-        position: [0, 0, 0.6],
-        rotationVector: [0, 0, 0],
-        view: currentView
-      };
-      setDesignElements((prev) => [...prev, newEl]);
-    }
-    // If image, handle image (not fully implemented in canvas yet but let's pass it)
+    const newEl = {
+      ...element,
+      id: Math.random().toString(36).substr(2, 9),
+      x: 0.5,
+      y: 0.5,
+      position: null, // Let DesignCanvas calculate the best surface position
+      rotationVector: [0, 0, 0],
+      scaleVector: [1, 1, 1],
+      view: currentView,
+      width: element.width || 100
+    };
+
+    setDesignElements((prev) => [...prev, newEl]);
     setUnsavedChanges(true);
   };
 

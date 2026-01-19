@@ -180,10 +180,18 @@ export default function DesignSidebar({
                     className="aspect-square rounded-lg border border-white/10 bg-white/5 relative group cursor-grab active:cursor-grabbing overflow-hidden hover:border-primary/50 transition-all"
                     draggable
                     onDragStart={(e: any) => handleElementDragStart(e, image)}
+                    onClick={() => onAddElement({
+                      id: image.id,
+                      type: 'image',
+                      url: image.url,
+                      content: image.url,
+                      name: image.name,
+                      width: 150
+                    })}
                   >
                     <img src={image.url} alt={image.name} className="w-full h-full object-contain p-2 transition-transform group-hover:scale-105" />
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-xs font-medium text-white">Drag Me</span>
+                      <span className="text-xs font-medium text-white">Click to Add</span>
                     </div>
                   </div>
                 ))}
