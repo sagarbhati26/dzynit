@@ -29,7 +29,16 @@ const ProductModel = forwardRef(function ProductModel(
 
     const box = new THREE.Box3().setFromObject(scene);
     const center = box.getCenter(new THREE.Vector3());
-    scene.position.sub(center);
+    const size = box.getSize(new THREE.Vector3());
+    
+    // Normalize scale so the model is always roughly 10 units in size
+    const maxDim = Math.max(size.x, size.y, size.z);
+    scene.scale.setScalar(10 / maxDim);
+    
+    // Center it AFTER scaling to ensure origin is exactly in the middle of the chest
+    const scaledBox = new THREE.Box3().setFromObject(scene);
+    const scaledCenter = scaledBox.getCenter(new THREE.Vector3());
+    scene.position.sub(scaledCenter);
 
     meshesRef.current = [];
 
