@@ -1,5 +1,6 @@
 import "./globals.css";
 import Navbar from "../components/Navbar";
+import SiteFooter from "../components/SiteFooter";
 
 export const metadata = {
   title: "Dzyn — Design & Marketplace",
@@ -17,9 +18,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col antialiased" suppressHydrationWarning>
         <Navbar />
         <main className="flex-1">{children}</main>
-        <footer className="py-8 text-center text-sm text-muted/80 border-t border-transparent/10">
-          © {new Date().getFullYear()} Dzyn — Crafted with ❤️ for creators
-        </footer>
+        <SiteFooter />
       </body>
     </html>
   );

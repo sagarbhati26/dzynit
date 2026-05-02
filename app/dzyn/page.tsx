@@ -5,6 +5,20 @@ import DesignSidebar from "@/components/DesignSidebar";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
+type StudioDesignElement = {
+  id: string;
+  type: string;
+  content: string;
+  width?: number;
+  view?: string;
+  x?: number;
+  y?: number;
+  position?: [number, number, number] | null;
+  rotationVector?: [number, number, number];
+  scaleVector?: [number, number, number];
+  [key: string]: unknown;
+};
+
 export default function DesignStudioPage() {
   const [designName, setDesignName] = useState("Untitled Design");
   const [isSaving, setIsSaving] = useState(false);
@@ -12,14 +26,14 @@ export default function DesignStudioPage() {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [lastSaved, setLastSaved] = useState("Just now");
   const [showTutorial, setShowTutorial] = useState(true);
-  const [designElements, setDesignElements] = useState<any[]>([]);
+  const [designElements, setDesignElements] = useState<StudioDesignElement[]>([]);
   const [productType, setProductType] = useState("tshirt");
   const [currentView, setCurrentView] = useState("front");
   const [selectedColor, setSelectedColor] = useState("black");
 
   // Communication between sidebar and canvas
-  const handleAddElement = (element: any) => {
-    const newEl = {
+  const handleAddElement = (element: StudioDesignElement) => {
+    const newEl: StudioDesignElement = {
       ...element,
       id: Math.random().toString(36).substr(2, 9),
       x: 0.5,
@@ -148,7 +162,7 @@ export default function DesignStudioPage() {
           {/* View Controls & Action Buttons */}
           <div className="flex items-center gap-3">
             {/* View Switcher */}
-            {/* <div className="glass-panel p-1 rounded-lg flex gap-1">
+            <div className="glass-panel p-1 rounded-lg flex gap-1">
               {['front', 'back', 'left', 'right'].map((view) => (
                 <button
                   key={view}
@@ -158,7 +172,7 @@ export default function DesignStudioPage() {
                   {view}
                 </button>
               ))}
-            </div> */}
+            </div>
 
             <div className="w-px h-6 bg-white/10 mx-2"></div>
 
@@ -214,7 +228,7 @@ export default function DesignStudioPage() {
             <h4 className="font-semibold text-white mb-1">Quick Tips</h4>
             <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
               <li>Drag on the canvas to rotate view</li>
-              <li>Click "Paint Brush" to colorize parts</li>
+              <li>Click &quot;Paint Brush&quot; to colorize parts</li>
               <li>Drop images from sidebar to add logos</li>
               <li>Use text tab to add custom typography</li>
             </ul>

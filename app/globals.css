@@ -38,7 +38,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  overflow: hidden; /* App-like feel */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Glassmorphism Utilities */
